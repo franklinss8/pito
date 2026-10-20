@@ -1,65 +1,52 @@
-import { getAddress } from "viem";
-import { db, PUBLIC_MACHINE_COLUMNS } from "@/lib/db";
+import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { ADDRESS_RE, findProgrammableLaunch, readToken } from "@/lib/eth";
 import { verifyAction } from "@/lib/auth";
-import { fail, handleError, ok, readJson } from "@/lib/http";
-import { planMachine } from "@/lib/machines";
+import { fail, handleError, ok, readJson, str } from "@/lib/http";
+import { listMachines } from "@/lib/machines";
+import { listGpuTypes, priceCents } from "@/lib/runpod";
+import { AI_MODELS, getTemplate } from "@/lib/templates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 30;
 
 export async function GET() {
-  try {
-    const { data, error } = await db().from("machines").select(PUBLIC_MACHINE_COLUMNS).order("created_at", { ascending: false }).limit(60);
-    if (error) throw error;
-    return ok({ machines: data });
-  } catch (e) { return handleError(e); }
+  try { return ok({ machines: await listMachines({ limit: 60 }) }); } catch (e) { return handleError(e); }
 }
 
-/** Register a machine: the token's Programmable launch wallet signs, Pito checks Ethereum, Claude drafts the plan. */
+/**
+ * Step 1+2 of the launch: create the machine (token draft + mission + computer choice).
+ * The creator signs; the machine gets its public pre-launch page right away.
+ */
 export async function POST(req: Request) {
   try {
-    let body;
-    try { body = await readJson(req); } catch { return fail(400, "BAD_REQUEST", "Send a JSON body."); }
-    const tokenRaw = String(body.tokenAddress ?? "").trim();
-    const mission = String(body.mission ?? "").trim();
-    if (!ADDRESS_RE.test(tokenRaw)) return fail(400, "BAD_TOKEN", "Token address must be 0x followed by 40 hex characters.");
-    if (mission.length < 12 || mission.length > 400) return fail(400, "BAD_MISSION", "Mission must be 12 to 400 characters.");
-    const token = getAddress(tokenRaw);
+    let b; try { b = await readJson(req); } catch { return fail(400, "bad_request", "Send a JSON body."); }
+    const name = str(b.name, 40), symbol = str(b.symbol, 10).replace(/^\$/, "").toUpperCase(), description = str(b.description, 500);
+    const image_url = str(b.imageUrl, 500), website = str(b.website, 200), x_handle = str(b.x, 60).replace(/^@/, "");
+    const mission = str(b.mission, 2000), template_id = getTemplate(str(b.templateId, 40)).id, gpu_type_id = str(b.gpuTypeId, 80);
+    const ai_model = AI_MODELS.some((m) => m.id === b.aiModel) ? String(b.aiModel) : AI_MODELS[0].id;
+    const cloud_type = b.cloudType === "SECURE" ? "SECURE" : "COMMUNITY";
+    if (!name) return fail(400, "bad_name", "Give the token a name.");
+    if (!/^[A-Z0-9]{1,10}$/.test(symbol)) return fail(400, "bad_symbol", "Ticker: letters and digits only, up to 10.");
+    if (mission.length < 20) return fail(400, "bad_mission", "Describe what the computer should build, in at least a sentence.");
+    if (image_url && !/^https:\/\/\S+$/i.test(image_url)) return fail(400, "bad_image", "Image URL must start with https://.");
 
-    const signer = await verifyAction({ message: body.message, signature: body.signature, action: "register", target: token });
+    const creator = await verifyAction({ message: b.message, signature: b.signature, action: "create", target: symbol });
 
-    const { data: existing } = await db().from("machines").select("id").eq("token_address", token.toLowerCase()).maybeSingle();
-    if (existing) return fail(409, "ALREADY_REGISTERED", "This token already has a machine.");
-
-    let meta;
-    try { meta = await readToken(token); }
-    catch { return fail(422, "NOT_A_TOKEN", "No ERC-20 token at this address on Ethereum mainnet. Copy the token address, not the pool."); }
-
-    const launch = await findProgrammableLaunch(token);
-    if (env.requireProgrammable) {
-      if (!launch) return fail(422, "NOT_PROGRAMMABLE", "No Programmable launch stamp found for this token on Ethereum. If you just launched, wait for the transaction to finalize (about 15 minutes) and try again.");
-      if (launch.launchWallet.toLowerCase() !== signer) return fail(403, "NOT_CREATOR", `Only the wallet that launched this token can register it (${launch.launchWallet}).`);
+    let gpu_name = "", vram_gb = 0, price = 0;
+    if (gpu_type_id) {
+      if (!env.hasRunpod) return fail(503, "no_gpu_provider", "GPU inventory is not available on this Pito yet.");
+      const g = (await listGpuTypes()).find((x) => x.id === gpu_type_id);
+      if (!g || !g.pricePerHourUsd) return fail(400, "bad_gpu", "That GPU is not available right now. Pick another.");
+      gpu_name = g.displayName; vram_gb = g.memoryInGb; price = priceCents(g.pricePerHourUsd);
     }
 
-    const { data: inserted, error } = await db().from("machines").insert({
-      token_address: token.toLowerCase(),
-      name: meta.name,
-      symbol: meta.symbol,
-      mission,
-      creator: signer,
-      router: launch?.router.toLowerCase() ?? null,
-      launch_id: launch?.launchId ?? null,
-      status: "planning",
-    }).select("id,name,symbol,token_address,mission").single();
-    if (error) {
-      if ((error as { code?: string }).code === "23505") return fail(409, "ALREADY_REGISTERED", "This token already has a machine.");
-      throw error;
-    }
-
-    const result = await planMachine(inserted);
-    return ok({ id: inserted.id, status: result.status }, 201);
+    const { data, error } = await db().from("machines").insert({
+      name, symbol, description, image_url, website, x_handle, creator, mission, template_id, gpu_type_id, gpu_name, vram_gb, ai_model, cloud_type,
+      price_cents_per_hour: price, status: "prelaunch",
+    }).select("id").single();
+    if (error) throw error;
+    await db().from("steps").insert({ machine_id: data.id, kind: "system", note: "Pre-launch page created. Waiting for the token launch on Programmable." });
+    return ok({ id: data.id, url: `${env.siteUrl}/project/${data.id}` }, 201);
   } catch (e) { return handleError(e); }
 }

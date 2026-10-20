@@ -10,10 +10,10 @@ const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"],
 
 export const metadata: Metadata = {
   title: "Pito · Give your token a computer",
-  description: "Launch a token on Ethereum through Programmable and give it a machine: a GPU and an AI agent that builds for your holders.",
+  description: "Launch a token on Ethereum through Programmable and give it a machine: a GPU and an AI that builds for your holders, in public.",
 };
 
-const DOCS = "https://github.com/franklinss8/pito#readme";
+const NAV = [["Discover", "/"], ["Computers", "/computers"], ["Originals", "/originals"], ["Templates", "/templates"], ["API", "/developers"], ["How it works", "/how-it-works"]];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,15 +24,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="wrap">
               <a className="brand" href="/"><Mark />pito</a>
               <span className="badge">MAINNET</span>
-              <nav className="links">
-                <a href="/">Discover</a>
-                <a href="/#machines">Computers</a>
-                <a href="/#templates">Templates</a>
-                <a href={DOCS} target="_blank" rel="noopener noreferrer">Docs</a>
-              </nav>
+              <nav className="links">{NAV.map(([n, h]) => <a key={h} href={h}>{n}</a>)}</nav>
               <div className="right">
                 <ThemeToggle />
                 <WalletButton />
+                <a className="btn small primary" href="/launch">Launch a token</a>
               </div>
             </div>
           </header>
@@ -43,21 +39,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Wordmark className="word" />
                 <div className="tag" style={{ marginTop: 18 }}>Tokens<br />Compute<br />Agents<br />A more capable internet</div>
               </div>
+              <ul>{NAV.map(([n, h]) => <li key={h}><a href={h}>{n}</a></li>)}</ul>
               <ul>
-                <li><a href="/">Discover</a></li>
-                <li><a href="/#machines">Computers</a></li>
-                <li><a href="/#templates">Templates</a></li>
-                <li><a href={DOCS} target="_blank" rel="noopener noreferrer">Docs</a></li>
-              </ul>
-              <ul>
-                <li><a href="https://etherscan.io" target="_blank" rel="noopener noreferrer">Ethereum Mainnet</a></li>
+                <li><a href="/launch">Launch a token</a></li>
+                <li><a href="/rent">Rent a computer</a></li>
                 <li><a href="https://programmable.market" target="_blank" rel="noopener noreferrer">Programmable</a></li>
-                <li><a href="/#fees">Fees</a></li>
+                <li><a href="https://github.com/franklinss8/pito" target="_blank" rel="noopener noreferrer">Source</a></li>
               </ul>
               <ul>
-                <li>© 2026 Pito</li>
-                <li>Not financial advice.</li>
-                <li>Tokens may lose all value.</li>
+                <li>pito · tokens with their own computer</li>
+                <li>© 2026 Pito · Ethereum mainnet</li>
+                <li>Not financial advice. Tokens may lose all value.</li>
               </ul>
             </div>
           </footer>

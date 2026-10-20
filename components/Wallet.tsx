@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { buildActionMessage } from "@/lib/message";
+import { buildActionMessage, type ActionName } from "@/lib/message";
 
 type Eip1193 = {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
@@ -14,7 +14,7 @@ type WalletCtx = {
   chainId: string | null;
   hasWallet: boolean;
   connect(): Promise<string>;
-  signAction(action: "register" | "run" | "replan", target: string): Promise<{ message: string; signature: string }>;
+  signAction(action: ActionName, target: string): Promise<{ message: string; signature: string }>;
   sendEth(to: string, valueWei: bigint, data: string): Promise<string>;
 };
 
@@ -62,7 +62,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return a;
   }, [ensureMainnet]);
 
-  const signAction = useCallback(async (action: "register" | "run" | "replan", target: string) => {
+  const signAction = useCallback(async (action: ActionName, target: string) => {
     const a = account ?? (await connect());
     const message = buildActionMessage(action, target, a);
     const signature = (await window.ethereum!.request({ method: "personal_sign", params: [toHexUtf8(message), a] })) as string;

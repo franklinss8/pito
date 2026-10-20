@@ -8,7 +8,7 @@ import { db } from "./db";
  * the wallet signs it (personal_sign), and the server checks it here.
  * Works for regular wallets and smart-contract wallets (ERC-1271 / ERC-6492).
  */
-export type Action = "register" | "run" | "replan";
+export type Action = "register" | "run" | "replan" | "create" | "bind" | "message" | "vote" | "rent" | "stop" | "resume" | "request";
 
 export class AuthError extends Error {
   constructor(public code: string, message: string) { super(message); }

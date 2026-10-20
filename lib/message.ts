@@ -1,5 +1,6 @@
 /** Shared by browser and server: the exact text a wallet signs for a Pito action. */
-export function buildActionMessage(action: "register" | "run" | "replan", target: string, wallet: string): string {
+export type ActionName = "register" | "run" | "replan" | "create" | "bind" | "message" | "vote" | "rent" | "stop" | "resume" | "request";
+export function buildActionMessage(action: ActionName, target: string, wallet: string): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   const nonce = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");

@@ -24,14 +24,18 @@ export async function readToken(token: Address) {
   return { name: String(name).slice(0, 80), symbol: String(symbol).slice(0, 20), decimals };
 }
 
+/** True when the wallet holds any amount of the token. */
+export async function isHolder(token: Address, wallet: Address): Promise<boolean> {
+  try {
+    const bal = await eth().readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [wallet] });
+    return bal > 0n;
+  } catch { return false; }
+}
+
 /* ---------- Programmable launch provenance (Ethereum Launch Stamp Router) ---------- */
 
-// Primary Router from Programmable's Ethereum module release (contracts/deployments/ethereum-module-release-v2.json).
 const PRIMARY_ROUTER = "0x8622DD5bAb44185f2A458ac90384Ac99248f8d56";
-const MANIFEST_URLS = [
-  "https://developers.programmable.family/api/v2/manifests/1",
-  "https://developers.programmable.family/api/v2/manifest",
-];
+const MANIFEST_URLS = ["https://developers.programmable.family/api/v2/manifests/1", "https://developers.programmable.family/api/v2/manifest"];
 
 const routerAbi = parseAbi([
   "function launchIdByToken(address token) view returns (bytes32 launchId)",
@@ -49,7 +53,6 @@ function pickAddress(v: unknown): string | null {
   return null;
 }
 
-/** Every Router generation published in Programmable's manifest, plus the primary one. */
 export async function getRouters(): Promise<Address[]> {
   if (routerCache && Date.now() - routerCache.at < 10 * 60_000) return routerCache.list;
   const found = new Set<string>([PRIMARY_ROUTER.toLowerCase()]);
@@ -68,7 +71,7 @@ export async function getRouters(): Promise<Address[]> {
         if (a) found.add(a.toLowerCase());
       }
       break;
-    } catch { /* manifest optional: primary Router still checked */ }
+    } catch { /* manifest optional */ }
   }
   const list = [...found].map((a) => getAddress(a));
   routerCache = { at: Date.now(), list };
@@ -77,7 +80,6 @@ export async function getRouters(): Promise<Address[]> {
 
 export type LaunchProof = { router: Address; launchId: Hex; launchWallet: Address; hook: Address; poolId: Hex };
 
-/** Finds the Programmable launch stamp for a token on Ethereum. Null when no Router recorded it. */
 export async function findProgrammableLaunch(token: Address): Promise<LaunchProof | null> {
   const c = eth();
   for (const router of await getRouters()) {
