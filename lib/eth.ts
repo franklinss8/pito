@@ -1,11 +1,11 @@
 import "server-only";
-import { createPublicClient, erc20Abi, http, parseAbi, getAddress, type Address, type Hex } from "viem";
+import { createPublicClient, erc20Abi, http, parseAbi, getAddress, type Address, type Hex, type PublicClient } from "viem";
 import { mainnet } from "viem/chains";
 import { env } from "./env";
 
-let client: ReturnType<typeof createPublicClient> | null = null;
-export function eth() {
-  client ??= createPublicClient({ chain: mainnet, transport: http(env.rpcUrl, { timeout: 15_000 }) });
+let client: PublicClient | null = null;
+export function eth(): PublicClient {
+  client ??= createPublicClient({ chain: mainnet, transport: http(env.rpcUrl, { timeout: 15_000 }) }) as PublicClient;
   return client;
 }
 
