@@ -27,7 +27,8 @@ export function HeroArt() {
       c!.width = W * dpr; c!.height = H * dpr;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    const cx = () => W * (W > 960 ? 0.64 : 0.5), cy = () => H * (W > 960 ? 0.5 : 0.78), sc = () => Math.min(W, 1100) * (W > 960 ? 0.19 : 0.16);
+    const wide = () => W > 960;
+    const cx = () => W * (wide() ? 0.7 : 0.5), cy = () => wide() ? H * 0.5 : H - 150, sc = () => wide() ? Math.min(W, 1200) * 0.16 : Math.min(W, 700) * 0.14;
 
     function proj(x: number, y: number, z: number, rot: number) {
       const cs = Math.cos(rot), sn = Math.sin(rot);

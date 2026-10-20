@@ -67,6 +67,7 @@ nav.links a:hover{color:var(--acc)}
 .corner.tr{top:20px;right:0;text-align:right}
 .corner.ml{left:0;top:52%}
 .corner.mr{right:0;top:52%;text-align:right}
+@media (max-width:1180px){.corner.ml,.corner.mr{display:none}}
 .corner.bl{left:0;bottom:24px}
 .corner.br{right:0;bottom:24px;text-align:right}
 
