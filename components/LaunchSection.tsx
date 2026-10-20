@@ -48,11 +48,12 @@ export function LaunchSection() {
     <>
       <section className="block" id="launch">
         <div className="wrap">
-          <div className="sec-head"><div>
-            <h2>Launch a machine</h2>
+          <div className="sec-head">
+            <h2>Launch a machine.</h2>
             <p>Prepare the coin here, launch and sign it on Programmable, then come back and register it with the same wallet.</p>
-          </div></div>
-          <div className="steps">
+            <span className="label acc">Ethereum · chain ID 1</span>
+          </div>
+          <div className="bench">
             <div className="step">
               <div className="num">1</div>
               <div>
@@ -91,7 +92,7 @@ export function LaunchSection() {
                   )}
                 </div>
                 <div className="handoff">
-                  <a className="btn primary" href={PROGRAMMABLE_ETH} target="_blank" rel="noopener noreferrer">Open Programmable · Ethereum ↗</a>
+                  <a className="btn primary" href={PROGRAMMABLE_ETH} target="_blank" rel="noopener noreferrer">Open Programmable · Ethereum →</a>
                   <span className="fine">Transactions are irreversible. Tokens can lose all value.</span>
                 </div>
               </div>
@@ -113,6 +114,15 @@ export function LaunchSection() {
     </>
   );
 }
+
+const TEMPLATES = [
+  { n: "Holder arcade", m: "Build a retro arcade game themed on the token, with a local high-score table and three difficulty levels." },
+  { n: "Lore generator", m: "Build a lore generator that writes origin stories, factions and a world map for the token community, with a copy button." },
+  { n: "Pixel mascot maker", m: "Build a pixel-art mascot maker where holders assemble a character from parts and export it as PNG." },
+  { n: "Meme studio", m: "Build a meme studio with templates, text overlays and the token logo as a sticker, exporting images locally." },
+  { n: "Holder quiz", m: "Build a quiz about Ethereum and the token with 20 questions, instant feedback and a shareable score card." },
+  { n: "Synth toy", m: "Build a browser synthesizer and step sequencer with a visualizer in the token colors." },
+];
 
 function RegisterForm() {
   const { signAction } = useWallet();
@@ -146,6 +156,9 @@ function RegisterForm() {
   return (
     <form className="form" onSubmit={submit} noValidate>
       <div className="field full"><label htmlFor="rAddr">Token contract address</label><input id="rAddr" className="mono" placeholder="0x…" autoComplete="off" spellCheck={false} value={addr} onChange={(e) => setAddr(e.target.value)} /></div>
+      <div className="field full" id="templates"><label>Templates</label>
+        <div className="chips">{TEMPLATES.map((t) => <button key={t.n} type="button" className="chip" onClick={() => setMission(t.m)}>{t.n}</button>)}</div>
+        <span className="hint">Start from a template, then edit the mission.</span></div>
       <div className="field full"><label htmlFor="rMission">Mission</label><textarea id="rMission" maxLength={400} placeholder="Build a pixel-art game where holders defend a castle." value={mission} onChange={(e) => setMission(e.target.value)} /><span className="hint">Plain words. The machine builds one interactive web app for holders.</span></div>
       <div className="full handoff" style={{ marginTop: 0 }}>
         <button className="btn primary" type="submit" disabled={busy}>{busy ? "Working…" : "Sign and register machine"}</button>

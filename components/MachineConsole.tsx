@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Machine } from "@/lib/db";
-import { PlanBox, statusChip } from "./MachineCard";
+import { PlanBox, StatusDot } from "./MachineCard";
+import { MachineArt } from "./MachineArt";
 import { errMessage, useWallet } from "./Wallet";
 import { fmtEth } from "@/lib/ethmath";
 
@@ -92,12 +93,12 @@ export function MachineConsole({ initial }: { initial: Machine }) {
   return (
     <div className="console">
       <div style={{ minWidth: 0, display: "grid", gap: 16 }}>
-        <div className="row">
+        <div className="head" style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 10 }}>
           <div>
-            <div className="ticker" style={{ fontSize: 34 }}>${m.symbol || "?"}</div>
+            <div className="ticker" style={{ fontSize: 40 }}>{m.symbol || "?"}</div>
             <div className="name">{m.name}</div>
           </div>
-          {statusChip(m.status)}
+          <StatusDot status={m.status} />
         </div>
         <div className="mission">{m.mission}</div>
         {m.app_updated_at ? (
@@ -106,11 +107,14 @@ export function MachineConsole({ initial }: { initial: Machine }) {
             className="appframe"
             src={`/apps/${m.id}?v=${encodeURIComponent(appVersion)}`}
             sandbox="allow-scripts allow-forms"
-            title={`$${m.symbol} app`}
+            title={`${m.symbol} app`}
           />
         ) : (
-          <div className="appempty">
-            {running ? "The machine is building its first app. This page refreshes on its own." : "No app yet. The creator starts a GPU run from the panel."}
+          <div style={{ position: "relative" }}>
+            <MachineArt seed={m.token_address} className="art" />
+            <div className="appempty" style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", border: 0, background: "transparent" }}>
+              <span style={{ background: "var(--bg)", padding: "8px 12px", border: "1px solid var(--line)" }}>{running ? "Building the first app on GPU. This page refreshes on its own." : "No app yet. The creator starts a GPU run from the panel."}</span>
+            </div>
           </div>
         )}
         {m.app_updated_at && <div className="fine">App shipped {new Date(m.app_updated_at).toLocaleString()}. It runs sandboxed: no wallet access and no network requests. <a href={`/apps/${m.id}`} target="_blank" rel="noopener">Open full screen ↗</a></div>}
@@ -118,7 +122,7 @@ export function MachineConsole({ initial }: { initial: Machine }) {
 
       <aside style={{ display: "grid", gap: 16 }}>
         <div className="panel">
-          <span className="label">Machine</span>
+          <span className="label acc">Machine</span>
           <dl className="kv">
             <dt>Token</dt><dd className="mono"><a href={`https://etherscan.io/token/${m.token_address}`} target="_blank" rel="noopener noreferrer">{m.token_address.slice(0, 8)}…{m.token_address.slice(-6)}</a></dd>
             <dt>Creator</dt><dd className="mono">{m.creator.slice(0, 8)}…{m.creator.slice(-6)}</dd>
@@ -135,7 +139,7 @@ export function MachineConsole({ initial }: { initial: Machine }) {
         {m.status === "plan_failed" && <div className="err">The build plan could not be drafted{m.plan?.summary ? `: ${m.plan.summary}` : "."}</div>}
 
         <div className="panel">
-          <span className="label">Controls</span>
+          <span className="label acc">Controls</span>
           {!account && <p className="fine" style={{ margin: 0 }}>Connect the creator wallet to run this machine.</p>}
           {account && !isCreator && <p className="fine" style={{ margin: 0 }}>Only the creator wallet can start runs.{funding?.mode === "paid" ? " Anyone can fund compute." : ""}</p>}
           {isCreator && (
@@ -151,7 +155,7 @@ export function MachineConsole({ initial }: { initial: Machine }) {
           {funding?.mode === "paid" && (
             <div style={{ display: "grid", gap: 8 }}>
               <div className="fine">One run costs {fmtEth(BigInt(funding.runPriceWei))} ETH, paid to the Pito treasury on Ethereum.</div>
-              <div className="row" style={{ justifyContent: "flex-start" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <input id="runsToBuy" className="mono" style={{ width: 80 }} inputMode="numeric" value={runs} onChange={(e) => setRuns(e.target.value)} aria-label="Runs to buy" />
                 <button className="btn" type="button" disabled={!!busy} onClick={fund}>{busy === "fund" ? "Funding…" : `Fund ${fmtEth(BigInt(funding.runPriceWei) * BigInt(Number(runs) > 0 && Number.isInteger(Number(runs)) ? Number(runs) : 0))} ETH`}</button>
               </div>

@@ -1,50 +1,64 @@
 import type { Metadata } from "next";
-import { Syne, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { WalletProvider, WalletButton } from "@/components/Wallet";
+import { Mark, Wordmark } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import "./globals.css";
 
-const syne = Syne({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-syne" });
-const plex = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex-mono" });
+const grotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "700"], variable: "--font-grotesk" });
+const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "Pito · Every token gets a machine",
-  description: "Launch your coin on Ethereum through Programmable, give it a mission, and its GPU machine builds an app for holders.",
+  title: "Pito · Give your token a computer",
+  description: "Launch a token on Ethereum through Programmable and give it a machine: a GPU and an AI agent that builds for your holders.",
 };
 
-function Mark() {
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="3" y="3" width="26" height="26" rx="5" fill="var(--accent)" />
-      <rect x="9" y="9" width="14" height="14" rx="2" fill="none" stroke="var(--accent-ink)" strokeWidth="2.4" />
-      <circle cx="16" cy="16" r="2.6" fill="var(--accent-ink)" />
-      <path d="M16 3v6M16 23v6M3 16h6M23 16h6" stroke="var(--accent-ink)" strokeWidth="2.4" />
-    </svg>
-  );
-}
+const DOCS = "https://github.com/franklinss8/pito#readme";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${syne.variable} ${plex.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${grotesk.variable} ${mono.variable}`} suppressHydrationWarning>
       <body>
         <WalletProvider>
           <header className="top">
             <div className="wrap">
               <a className="brand" href="/"><Mark />pito</a>
+              <span className="badge">MAINNET</span>
               <nav className="links">
-                <a href="/#machines">Machines</a>
-                <a href="/#launch">Launch</a>
-                <a href="/#fees">Fees</a>
+                <a href="/">Discover</a>
+                <a href="/#machines">Computers</a>
+                <a href="/#templates">Templates</a>
+                <a href={DOCS} target="_blank" rel="noopener noreferrer">Docs</a>
               </nav>
-              <WalletButton />
-              <a className="btn small primary" href="/#launch">Launch a token</a>
+              <div className="right">
+                <ThemeToggle />
+                <WalletButton />
+              </div>
             </div>
           </header>
           {children}
           <footer>
             <div className="wrap">
-              <span>pito · tokens with a machine · Ethereum mainnet</span>
-              <span>Launches run on <a href="https://programmable.market" target="_blank" rel="noopener noreferrer">Programmable</a>. Not financial advice.</span>
+              <div>
+                <Wordmark className="word" />
+                <div className="tag" style={{ marginTop: 18 }}>Tokens<br />Compute<br />Agents<br />A more capable internet</div>
+              </div>
+              <ul>
+                <li><a href="/">Discover</a></li>
+                <li><a href="/#machines">Computers</a></li>
+                <li><a href="/#templates">Templates</a></li>
+                <li><a href={DOCS} target="_blank" rel="noopener noreferrer">Docs</a></li>
+              </ul>
+              <ul>
+                <li><a href="https://etherscan.io" target="_blank" rel="noopener noreferrer">Ethereum Mainnet</a></li>
+                <li><a href="https://programmable.market" target="_blank" rel="noopener noreferrer">Programmable</a></li>
+                <li><a href="/#fees">Fees</a></li>
+              </ul>
+              <ul>
+                <li>© 2026 Pito</li>
+                <li>Not financial advice.</li>
+                <li>Tokens may lose all value.</li>
+              </ul>
             </div>
           </footer>
         </WalletProvider>
