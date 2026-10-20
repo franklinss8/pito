@@ -1,0 +1,16 @@
+{
+  "input": {
+    "token": { "address": "0x0000000000000000000000000000000000000001", "name": "Test Machine", "symbol": "TEST", "chainId": 1 },
+    "mission": "Build a small pixel-art game where holders defend a castle from waves of slimes.",
+    "plan": {
+      "summary": "A browser tower-defense game themed around $TEST.",
+      "steps": [
+        { "title": "Design the map", "detail": "Grid castle map drawn on canvas" },
+        { "title": "Add enemy waves", "detail": "Slimes spawn and follow a path" },
+        { "title": "Add towers", "detail": "Click to place towers that shoot" }
+      ],
+      "gpu": "1x 48 GB",
+      "deliverable": "Playable tower-defense game"
+    }
+  }
+}
