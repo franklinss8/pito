@@ -322,12 +322,12 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
           <div className="section-num">{isApi ? "05 · The endpoint" : "05 · The app"}</div>
           <div className="panel">
             <div className="row"><span className="label">Status</span><StatusDot m={m} /></div>
-            <div className="fine">{m.app_updated_at ? `${isApi ? "Live" : "Shipped"} ${new Date(m.app_updated_at).toLocaleString()}. ${isApi ? "Base URL below; interactive docs at /docs." : "The app runs on the machine's own computer."}` : isApi ? "The endpoint goes live once the machine has built and tested it." : "The link works once the app ships."}</div>
+            <div className="fine">{m.app_updated_at ? `${isApi ? "Live" : "Shipped"} ${new Date(m.app_updated_at).toLocaleString()}. ${isApi ? "Base URL below; interactive docs at /docs." : online ? "Served by the machine's own computer." : "The computer is asleep; Pito hosts the last snapshot, so the product stays online."}` : isApi ? "The endpoint goes live once the machine has built and tested it." : "The link works once the app ships."}</div>
             {isApi && m.app_url && <div className="mono fine" style={{ overflowWrap: "anywhere" }}>{m.app_url}</div>}
             {isApi && m.app_updated_at && m.app_url && <a className="btn block primary" href={`${m.app_url}/docs`} target="_blank" rel="noopener noreferrer">Open the docs ↗</a>}
             <div className="mono fine" style={{ overflowWrap: "anywhere" }}>{origin}/app/{m.id}</div>
             <a className={`btn block ${m.app_updated_at ? "primary" : ""}`} href={`/app/${m.id}`} target="_blank" rel="noopener" aria-disabled={!m.app_updated_at}>Open the app ↗</a>
-            {m.app_updated_at && m.app_url && <iframe className="appframe" src={m.app_url} title={`$${m.symbol} app`} sandbox="allow-scripts allow-forms allow-same-origin allow-popups" style={{ height: 420, minHeight: 0 }} />}
+            {m.app_updated_at && <iframe className="appframe" src={`/app/${m.id}/`} title={`$${m.symbol} app`} sandbox="allow-scripts allow-forms allow-same-origin allow-popups" style={{ height: 420, minHeight: 0 }} />}
           </div>
         </div>
       </section>

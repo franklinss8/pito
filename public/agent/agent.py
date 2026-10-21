@@ -43,6 +43,9 @@ Holders watch your screen, read every step, and talk to you. Build what the miss
 Your workspace is /workspace. The app you build lives in /workspace/app and is served on port 8080
 (a static server runs there by default; you may replace it with your own server on port 8080, e.g. node or python).
 Prefer simple, reliable stacks: static HTML/JS, Python http.server, Node/Express. Keep the app working at all times.
+Pito snapshots the static files in /workspace/app every few minutes and hosts them when this computer is off, so put
+the user-facing front-end there as static files (index.html, css, js) and keep any backend as a graceful optional layer:
+the page must still load and explain itself when the backend is unreachable.
 
 Rules: never ask for or handle private keys; never promise prices, returns or airdrops; no market manipulation;
 no illegal content. Holder requests: bugs are fixed right away; features need 3 votes (status 'approved');
@@ -137,7 +140,9 @@ def act(a):
     if t == "note":
         step("note", note=a.get("body", "")); return "ok"
     if t == "app_live":
-        report(type="app", live=bool(a.get("live"))); step("built", note="App is live." if a.get("live") else "App taken offline."); return "ok"
+        report(type="app", live=bool(a.get("live"))); step("built", note="App is live." if a.get("live") else "App taken offline.")
+        if a.get("live"): snapshot(force=True)
+        return "ok"
     if t == "idle":
         time.sleep(min(600, int(a.get("seconds", 60)))); return "ok"
     return "unknown action"
@@ -156,6 +161,33 @@ def frame():
         requests.post(f"{API}/api/agent/{MID}/frame", headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "image/jpeg"}, data=jpg, timeout=30)
     except Exception as e:
         print("frame failed", e); _pw = None
+
+# ---------- snapshot: keep the product online on Pito while the GPU sleeps ----------
+SNAP_SKIP = ("node_modules", ".git", "venv", ".venv", "__pycache__", "models", ".cache", "checkpoints", "data")
+SNAP_EXT = (".html", ".htm", ".css", ".js", ".mjs", ".json", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".txt", ".md", ".wasm", ".mp3", ".mp4", ".webm")
+_snap_sig = None
+def snapshot(force=False):
+    """Upload /workspace/app static files (<= 4 MB each, 40 MB total) so Pito can host them when the computer is off."""
+    global _snap_sig
+    try:
+        files = [p for p in APP.rglob("*") if p.is_file() and not any(part in SNAP_SKIP for part in p.relative_to(APP).parts) and p.suffix.lower() in SNAP_EXT and p.stat().st_size <= 4_000_000]
+        files.sort(); total = 0; kept = []
+        for p in files:
+            total += p.stat().st_size
+            if total > 40_000_000: break
+            kept.append(p)
+        sig = tuple((str(p.relative_to(APP)), p.stat().st_mtime_ns, p.stat().st_size) for p in kept)
+        if not force and sig == _snap_sig: return
+        import mimetypes
+        for p in kept:
+            rel = str(p.relative_to(APP))
+            ctype = mimetypes.guess_type(rel)[0] or "application/octet-stream"
+            requests.put(f"{API}/api/agent/{MID}/snapshot", params={"path": rel}, headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": ctype}, data=p.read_bytes(), timeout=60)
+        requests.post(f"{API}/api/agent/{MID}/snapshot", headers=H, json={"files": [str(p.relative_to(APP)) for p in kept]}, timeout=30)
+        _snap_sig = sig
+        if force: step("system", note=f"Snapshot published: {len(kept)} files hosted by Pito while the computer sleeps.")
+    except Exception as e:
+        print("snapshot failed", e)
 
 def health():
     try: return requests.get("http://127.0.0.1:8080/", timeout=5).status_code < 500
@@ -178,7 +210,7 @@ def maybe_update():
 # ---------- main loop ----------
 def main():
     step("system", note=f"AI online ({MODEL}). Reading the mission.")
-    last_frame = 0; history = []
+    last_frame = 0; last_snap = 0; history = []
     while True:
         try:
             if not health():
@@ -194,6 +226,7 @@ def main():
             result = act(a.get("action", {"type": "idle", "seconds": 60}))
             history += [{"role": "assistant", "content": json.dumps(a)[:3000]}, {"role": "user", "content": f"Result: {str(result)[:3000]}"}]
             if time.time() - last_frame > FRAME_EVERY: frame(); last_frame = time.time()
+            if time.time() - last_snap > 300: snapshot(); last_snap = time.time()
             time.sleep(3 if a.get("action", {}).get("type") in ("shell", "write_file") else LOOP_SLEEP)
             maybe_update()
         except SystemExit: raise
