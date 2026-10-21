@@ -3,6 +3,7 @@ import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { WalletProvider, WalletButton } from "@/components/Wallet";
 import { Mark, Wordmark } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Toaster } from "@/components/Toaster";
 import "./globals.css";
 
 const grotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "700"], variable: "--font-grotesk" });
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </ul>
             </div>
           </footer>
+          <Toaster />
         </WalletProvider>
       </body>
     </html>

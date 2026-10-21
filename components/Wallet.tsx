@@ -106,13 +106,19 @@ export function useWallet() {
 }
 
 export function WalletButton() {
-  const { account, chainId, connect } = useWallet();
-  const [err, setErr] = useState("");
-  const label = account ? `${account.slice(0, 6)}…${account.slice(-4)}${chainId && chainId !== "0x1" ? " · wrong network" : ""}` : "Connect wallet";
+  const { account, chainId, connect, hasWallet } = useWallet();
+  const [busy, setBusy] = useState(false);
+  const label = account ? `${account.slice(0, 6)}…${account.slice(-4)}${chainId && chainId !== "0x1" ? " · wrong network" : ""}` : busy ? "Check your wallet…" : "Connect wallet";
   return (
-    <button className="btn small" type="button" title={err || undefined}
-      onClick={() => connect().then(() => setErr("")).catch((e: Error) => setErr(e.message))}>
-      {err && !account ? "No wallet found" : label}
+    <button className="btn small" type="button" disabled={busy}
+      onClick={async () => {
+        if (!hasWallet) { window.dispatchEvent(new CustomEvent("pito-toast", { detail: { text: "No Ethereum wallet found. Install MetaMask, Rabby or Coinbase Wallet, then reload.", kind: "err" } })); return; }
+        setBusy(true);
+        try { await connect(); window.dispatchEvent(new CustomEvent("pito-toast", { detail: { text: "Wallet connected on Ethereum mainnet.", kind: "ok" } })); }
+        catch (e) { window.dispatchEvent(new CustomEvent("pito-toast", { detail: { text: errMessage(e), kind: "err" } })); }
+        finally { setBusy(false); }
+      }}>
+      {label}
     </button>
   );
 }

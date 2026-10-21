@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { errMessage, useWallet } from "@/components/Wallet";
+import { toast } from "@/components/Toaster";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -19,12 +20,13 @@ export default function Models() {
     const next = [...msgs, { role: "user" as const, content: text }];
     setMsgs(next); setInput(""); setBusy(true); setErr("");
     try {
+      if (msgs.length === 0) toast("Sign once in your wallet to prove you hold a Pito token (no gas).");
       const { message, signature } = await signAction("request", "house-model");
       const r = await fetch("/api/house-model", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next, message, signature }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error?.message || "The model did not answer.");
       setMsgs([...next, { role: "assistant", content: j.text }]);
-    } catch (e2) { setErr(errMessage(e2)); setMsgs(msgs); }
+    } catch (e2) { setErr(errMessage(e2)); toast(errMessage(e2), "err"); setMsgs(msgs); }
     finally { setBusy(false); }
   }
 

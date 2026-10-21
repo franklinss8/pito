@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Machine, Message, Step } from "@/lib/db";
 import { errMessage, useWallet } from "./Wallet";
+import { toast } from "./Toaster";
 import { StatusDot, fmtCap, machineState } from "./MachineCard";
 import { MachineArt } from "./MachineArt";
 import { AI_MODELS, getTemplate } from "@/lib/templates";
@@ -52,17 +53,19 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
   const pricePerHour = m.price_cents_per_hour;
   const priceCents = pricePerHour * (Number(hours) || 0);
   const ethAmt = eth && priceCents > 0 ? (priceCents / 100 / eth).toFixed(5) : null;
-  const copy = async (t: string, label: string) => { try { await navigator.clipboard.writeText(t); setMsg({ kind: "ok", text: `${label} copied.` }); } catch { setMsg({ kind: "err", text: "Copy blocked; select the text instead." }); } };
+  const copy = async (t: string, label: string) => { try { await navigator.clipboard.writeText(t); toast(`${label} copied.`); } catch { toast("Copy blocked by the browser; select the text instead.", "err"); } };
 
   async function signed(path: string, action: Parameters<typeof signAction>[0], target: string, body: Record<string, unknown>, label: string) {
     setBusy(label); setMsg(null);
     try {
+      if (label === "power") toast(`Sign in your wallet to ${body.op === "stop" ? "stop" : "start"} the computer (no gas).`);
       const s = await signAction(action, target);
+      if (label === "power") toast(body.op === "stop" ? "Stopping the computer…" : "Starting the computer…");
       const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...s }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error?.message || "Request failed.");
       await load(); return j;
-    } catch (e) { setMsg({ kind: "err", text: errMessage(e) }); return null; }
+    } catch (e) { setMsg({ kind: "err", text: errMessage(e) }); toast(errMessage(e), "err"); return null; }
     finally { setBusy(""); }
   }
 
@@ -123,10 +126,11 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
 
   async function send(e: React.FormEvent) {
     e.preventDefault(); const body = chat.trim(); if (body.length < 2) return;
+    toast("Sign the message in your wallet (no gas).");
     const j = await signed(`/api/machines/${m.id}/messages`, "message", m.id, { body, kind }, "chat");
-    if (j) { setChat(""); setTimeout(() => feedRef.current?.scrollTo({ top: 1e9 }), 100); }
+    if (j) { setChat(""); toast("Sent. The AI replies on its next loop."); setTimeout(() => feedRef.current?.scrollTo({ top: 1e9 }), 100); }
   }
-  async function vote(id: string) { const j = await signed(`/api/machines/${m.id}/vote`, "vote", id, { messageId: id }, "vote"); if (j) setMsg({ kind: "ok", text: `${j.votes}/${j.needed} votes${j.status === "approved" ? " · approved, the AI will build it" : ""}.` }); }
+  async function vote(id: string) { toast("Sign the vote in your wallet (no gas)."); const j = await signed(`/api/machines/${m.id}/vote`, "vote", id, { messageId: id }, "vote"); if (j) toast(`${j.votes}/${j.needed} votes${j.status === "approved" ? " · approved, the AI will build it" : ""}.`); }
 
   const messages = d?.messages ?? [], steps = d?.steps ?? [];
   const plan = m.plan;

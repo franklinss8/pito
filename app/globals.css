@@ -316,3 +316,8 @@ select:focus{outline:none;border-color:var(--acc)}
 .why-grid p{margin:0}
 .why .why-sum{color:var(--fg);margin:0}
 @media (max-width:860px){.why-grid{grid-template-columns:1fr}}
+
+.toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));display:grid;gap:8px;z-index:30;max-width:calc(100% - 32px)}
+.toasts .toast{position:static;transform:none}
+.toast-err{background:var(--bad);color:#fff}
+.btn.busy{opacity:.7;cursor:progress}

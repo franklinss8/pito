@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { errMessage, useWallet } from "@/components/Wallet";
+import { toast } from "@/components/Toaster";
 import { TEMPLATES } from "@/lib/templates";
 import { ethToWei, fmtEth } from "@/lib/ethmath";
 
@@ -8,7 +9,7 @@ type Gpu = { id: string; name: string; vram_gb: number; cents_per_hour: number }
 type Rental = { id: string; gpu_name: string; template_id: string; status: string; connect_url: string | null; budget_cents: number; spent_cents: number; price_cents_per_hour: number; created_at: string };
 
 export default function Rent() {
-  const { account, signAction, sendEth } = useWallet();
+  const { account, hasWallet, signAction, sendEth } = useWallet();
   const [gpus, setGpus] = useState<Gpu[]>([]);
   const [gpu, setGpu] = useState("");
   const [tpl, setTpl] = useState("desktop");
@@ -28,16 +29,25 @@ export default function Rent() {
   const cents = g && Number.isFinite(h) && h > 0 ? Math.ceil(g.cents_per_hour * h) : 0;
   const ethAmt = eth && cents ? (cents / 100 / eth).toFixed(5) : null;
 
+  const [listing, setListing] = useState<"idle" | "signing" | "loading" | "done">("idle");
   async function loadMine() {
+    if (!hasWallet) { toast("No Ethereum wallet found in this browser. Install MetaMask or Rabby to rent.", "err"); return; }
+    setListing("signing");
     try {
+      if (!account) toast("Connect your wallet to list your computers.");
       const { message, signature } = await signAction("request", "rentals");
+      setListing("loading");
       const r = await fetch("/api/rent", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, signature }) });
-      const j = await r.json(); if (r.ok) setRentals(j.rentals);
-    } catch (e) { setMsg({ kind: "err", text: errMessage(e) }); }
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error?.message || "Could not list your computers.");
+      setRentals(j.rentals); setListing("done");
+      toast(j.rentals.length ? `${j.rentals.length} computer${j.rentals.length === 1 ? "" : "s"} found.` : "No computers rented by this wallet yet.");
+    } catch (e) { setListing("idle"); toast(errMessage(e), "err"); }
   }
 
   async function rent() {
-    if (!g || !ethAmt) return;
+    if (!hasWallet) { toast("No Ethereum wallet found in this browser.", "err"); return; }
+    if (!g || !ethAmt) { toast("Pick a GPU and a number of hours first.", "err"); return; }
     setBusy("rent"); setMsg(null);
     try {
       const { message, signature } = await signAction("rent", g.id);
@@ -83,8 +93,8 @@ export default function Rent() {
           {msg && <div className={msg.kind === "err" ? "err" : "okmsg"}>{msg.text}</div>}
         </div>
         <aside className="panel">
-          <div className="row"><span className="label acc">My computers</span><button className="btn small" type="button" onClick={loadMine}>Refresh (sign)</button></div>
-          {rentals.length === 0 && <div className="fine">Sign to list the computers rented by your wallet.</div>}
+          <div className="row"><span className="label acc">My computers</span><button className={`btn small ${listing === "signing" || listing === "loading" ? "busy" : ""}`} type="button" disabled={listing === "signing" || listing === "loading"} onClick={loadMine}>{listing === "signing" ? "Sign in wallet…" : listing === "loading" ? "Loading…" : account ? "Refresh (sign)" : "Connect & list"}</button></div>
+          {rentals.length === 0 && <div className="fine">{listing === "done" ? "No computers rented by this wallet yet. Rent one on the left." : account ? "Sign a message (no gas) to list the computers rented by your wallet." : "Connect your wallet, then sign a message (no gas) to list your computers."}</div>}
           {rentals.map((r) => (
             <div key={r.id} className="plan">
               <div className="row"><b>{r.gpu_name}</b><span className={`status ${r.status === "running" ? "on" : r.status === "starting" ? "warn" : ""}`}><span className={`dot ${r.status === "running" ? "on" : r.status === "starting" ? "warn" : ""}`} />{r.status}</span></div>
