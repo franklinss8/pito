@@ -30,13 +30,14 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
   const [frameTick, setFrameTick] = useState(0);
   const [tab, setTab] = useState<"chat" | "activity">("chat");
   const [origin, setOrigin] = useState("");
+  const [handoff, setHandoff] = useState<Record<string, unknown> | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/machines/${initial.id}`, { cache: "no-store" });
     if (r.ok) setD(await r.json());
   }, [initial.id]);
-  useEffect(() => { setOrigin(location.origin); load(); fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot").then((r) => r.json()).then((j) => setEth(Number(j.data.amount))).catch(() => {}); }, [load]);
+  useEffect(() => { setOrigin(location.origin); try { const h = localStorage.getItem(`pito-handoff-${initial.id}`); if (h) setHandoff(JSON.parse(h)); } catch {} load(); fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot").then((r) => r.json()).then((j) => setEth(Number(j.data.amount))).catch(() => {}); }, [load]);
   useEffect(() => { const t = setInterval(load, 10_000); return () => clearInterval(t); }, [load]);
   useEffect(() => { const t = setInterval(() => setFrameTick((x) => x + 1), 6000); return () => clearInterval(t); }, []);
 
@@ -133,6 +134,16 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
           <div className="handoff" style={{ marginTop: 0 }}>
             <button className="btn" type="button" onClick={() => copy(location.href, "Page link")}>Copy page link</button>
             <a className="btn primary" href={PROGRAMMABLE} target="_blank" rel="noopener noreferrer">Open Programmable · Ethereum →</a>
+          </div>
+          <div className="sheet" style={{ marginTop: 16 }}>
+            {([
+              ["Name", m.name], ["Ticker", m.symbol], ["Description", m.description], ["Image URL", m.image_url],
+              ["Website", origin ? `${origin}/project/${m.id}` : ""], ["X (Twitter)", m.x_handle ? `@${m.x_handle}` : ""],
+              ...(handoff ? (["telegram", "discord", "github", "gitbook"] as const).map((k) => [k[0].toUpperCase() + k.slice(1), String((handoff.links as Record<string, string> | undefined)?.[k] ?? "")]) : []),
+              ["Creator fees", handoff ? `${Number(handoff.feeBps) / 100}% buy & sell` : ""], ["First buy", handoff ? `${handoff.initialBuy} ETH` : ""],
+            ] as [string, string][]).filter(([, v]) => v).map(([k, v]) => (
+              <div className="sheet-row" key={k}><span className="k">{k}</span><span className="v" style={{ overflowWrap: "anywhere" }}>{v}</span><button className="btn small" type="button" onClick={() => copy(String(v).replace(/^@/, ""), k)}>Copy</button></div>
+            ))}
           </div>
           <div className="form" style={{ marginTop: 16 }}>
             <div className="field full"><label htmlFor="bindAddr">Token contract address (after the launch finalizes, ~15 min)</label><input id="bindAddr" className="mono" value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x…" spellCheck={false} /></div>
