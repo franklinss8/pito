@@ -300,3 +300,7 @@ select:focus{outline:none;border-color:var(--acc)}
 .pl-market>strong{font-size:15px;font-weight:500}
 .pl-previewfoot{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:24px}
 @media (max-width:860px){.pl-layout{grid-template-columns:1fr}.pl-preview{position:static}.pl-two,.pl-namefields{grid-template-columns:1fr}}
+
+.pl-tokencard{display:grid;grid-template-columns:72px 1fr;gap:16px;align-items:start;border:1px solid var(--line);background:var(--bg);padding:16px;border-radius:12px;margin-bottom:8px}
+.pl-tokencard img{width:72px;height:72px;object-fit:cover;border-radius:12px;display:block}
+.pl-tokenph{width:72px;height:72px;border-radius:12px;border:1px dashed var(--muted);display:grid;place-items:center;color:var(--muted);font-size:28px}

@@ -93,3 +93,46 @@ export async function findProgrammableLaunch(token: Address): Promise<LaunchProo
   }
   return null;
 }
+
+/* ---------- Foundation coin metadata and creator fees ---------- */
+
+const foundationTokenAbi = parseAbi([
+  "function metadata() view returns (string description,string website,string image,bytes extraData)",
+]);
+const hookAbi = parseAbi([
+  "function ledger() view returns (address)",
+  "function creator() view returns (address)",
+  "function quote() view returns (address)",
+]);
+const ledgerAbi = parseAbi([
+  "function creator() view returns (address)",
+  "function quote() view returns (address)",
+  "function creatorCredited() view returns (uint256)",
+  "function creatorClaimed() view returns (uint256)",
+]);
+
+/** Description, website and image recorded onchain at launch (Foundation coins). Empty strings when not a Foundation token. */
+export async function readFoundationMetadata(token: Address): Promise<{ description: string; website: string; image: string }> {
+  try {
+    const [description, website, image] = await eth().readContract({ address: token, abi: foundationTokenAbi, functionName: "metadata" });
+    return { description: String(description).slice(0, 500), website: String(website).slice(0, 200), image: String(image).slice(0, 500) };
+  } catch { return { description: "", website: "", image: "" }; }
+}
+
+export type CreatorFees = { ledger: Address; creator: Address; quote: Address; creditedWei: bigint; claimedWei: bigint; claimableWei: bigint };
+
+/** Creator fees accrued in the coin's Foundation ledger. Null when the coin has no readable ledger. */
+export async function readCreatorFees(hook: Address): Promise<CreatorFees | null> {
+  const c = eth();
+  try {
+    const ledger = await c.readContract({ address: hook, abi: hookAbi, functionName: "ledger" });
+    const [creator, quote, credited, claimed] = await Promise.all([
+      c.readContract({ address: ledger, abi: ledgerAbi, functionName: "creator" }),
+      c.readContract({ address: ledger, abi: ledgerAbi, functionName: "quote" }),
+      c.readContract({ address: ledger, abi: ledgerAbi, functionName: "creatorCredited" }),
+      c.readContract({ address: ledger, abi: ledgerAbi, functionName: "creatorClaimed" }),
+    ]);
+    const creditedWei = BigInt(credited as bigint), claimedWei = BigInt(claimed as bigint);
+    return { ledger: ledger as Address, creator: creator as Address, quote: quote as Address, creditedWei, claimedWei, claimableWei: creditedWei > claimedWei ? creditedWei - claimedWei : 0n };
+  } catch { return null; }
+}

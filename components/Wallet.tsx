@@ -16,6 +16,8 @@ type WalletCtx = {
   connect(): Promise<string>;
   signAction(action: ActionName, target: string): Promise<{ message: string; signature: string }>;
   sendEth(to: string, valueWei: bigint, data: string): Promise<string>;
+  sendTx(tx: { to: string; data?: string; valueWei?: bigint }): Promise<string>;
+  waitReceipt(hash: string, timeoutMs?: number): Promise<{ status: string; logs: { address: string; topics: string[]; data: string }[] } | null>;
 };
 
 const Ctx = createContext<WalletCtx | null>(null);
@@ -78,7 +80,23 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     })) as string;
   }, [account, connect, ensureMainnet]);
 
-  return <Ctx.Provider value={{ account, chainId, hasWallet, connect, signAction, sendEth }}>{children}</Ctx.Provider>;
+  const sendTx = useCallback(async (tx: { to: string; data?: string; valueWei?: bigint }) => {
+    const a = account ?? (await connect());
+    await ensureMainnet();
+    return (await window.ethereum!.request({ method: "eth_sendTransaction", params: [{ from: a, to: tx.to, data: tx.data ?? "0x", value: "0x" + (tx.valueWei ?? 0n).toString(16) }] })) as string;
+  }, [account, connect, ensureMainnet]);
+
+  const waitReceipt = useCallback(async (hash: string, timeoutMs = 180_000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < timeoutMs) {
+      const r = (await window.ethereum!.request({ method: "eth_getTransactionReceipt", params: [hash] })) as { status: string; logs: { address: string; topics: string[]; data: string }[] } | null;
+      if (r) return r;
+      await new Promise((res) => setTimeout(res, 4000));
+    }
+    return null;
+  }, []);
+
+  return <Ctx.Provider value={{ account, chainId, hasWallet, connect, signAction, sendEth, sendTx, waitReceipt }}>{children}</Ctx.Provider>;
 }
 
 export function useWallet() {

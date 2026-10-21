@@ -107,8 +107,8 @@ export function LaunchCoin() {
   const locked = busy === "launch";
   return (
     <div className="pl">
-      <div className="pl-top"><a href="/" className="pl-back">← Home</a><span className="pl-net">Ethereum Mainnet</span></div>
       <h1 className="pl-h1">Launch a Coin</h1>
+      <p className="sub">Prepare the coin and its public page first, launch on Programmable, then bind the token from the page.</p>
       <div className="pl-layout">
         <form className="pl-form" noValidate onSubmit={launch}>
           <fieldset className="pl-fieldset" disabled={locked}>

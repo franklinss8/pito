@@ -18,7 +18,7 @@ const STAGES = ["setup", "plan", "build", "test", "ship"];
 const PROGRAMMABLE = "https://programmable.market/launch/modules/foundation?chainId=1";
 
 export function ProjectPage({ initial, justCreated }: { initial: Machine; justCreated: boolean }) {
-  const { account, signAction, sendEth } = useWallet();
+  const { account, signAction, sendEth, sendTx, waitReceipt } = useWallet();
   const [d, setD] = useState<Data | null>(null);
   const m = d?.machine ?? initial;
   const [busy, setBusy] = useState("");
@@ -31,11 +31,13 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
   const [tab, setTab] = useState<"chat" | "activity">("chat");
   const [origin, setOrigin] = useState("");
   const [handoff, setHandoff] = useState<Record<string, unknown> | null>(null);
+  const [fees, setFees] = useState<{ available: boolean; ledger?: string; creator?: string; native?: boolean; claimable_wei?: string; treasury?: string | null; note?: string } | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/machines/${initial.id}`, { cache: "no-store" });
     if (r.ok) setD(await r.json());
+    fetch(`/api/machines/${initial.id}/fees`, { cache: "no-store" }).then((x) => x.json()).then(setFees).catch(() => {});
   }, [initial.id]);
   useEffect(() => { setOrigin(location.origin); try { const h = localStorage.getItem(`pito-handoff-${initial.id}`); if (h) setHandoff(JSON.parse(h)); } catch {} load(); fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot").then((r) => r.json()).then((j) => setEth(Number(j.data.amount))).catch(() => {}); }, [load]);
   useEffect(() => { const t = setInterval(load, 10_000); return () => clearInterval(t); }, [load]);
@@ -87,6 +89,38 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
     } catch (e) { setMsg({ kind: "err", text: errMessage(e) }); }
     finally { setBusy(""); }
   }
+  async function claimAndFund() {
+    if (!fees?.available || !fees.ledger) return;
+    setBusy("fees"); setMsg(null);
+    try {
+      const { encodeFunctionData, parseAbi, decodeEventLog } = await import("viem");
+      const abi = parseAbi(["function claimCreator() returns (uint256 amount)", "event QuoteClaimed(address indexed beneficiary,uint8 indexed budget,uint256 amount)"]);
+      setMsg({ kind: "ok", text: "Confirm the claim in your wallet. The fees are paid to the creator wallet first." });
+      const hash = await sendTx({ to: fees.ledger, data: encodeFunctionData({ abi, functionName: "claimCreator" }) });
+      setMsg({ kind: "ok", text: `Claim sent (${hash.slice(0, 10)}…). Waiting for confirmation…` });
+      const receipt = await waitReceipt(hash);
+      if (!receipt || receipt.status !== "0x1") throw new Error("The claim did not confirm. Check the transaction and try again.");
+      let claimed = 0n;
+      for (const log of receipt.logs) { try { const ev = decodeEventLog({ abi, data: log.data as `0x${string}`, topics: log.topics as [`0x${string}`, ...`0x${string}`[]] }); if (ev.eventName === "QuoteClaimed") claimed = (ev.args as { amount: bigint }).amount; } catch {} }
+      if (claimed === 0n) { setMsg({ kind: "ok", text: "Claim confirmed, but nothing was claimable yet." }); await load(); return; }
+      const eth = Number(claimed) / 1e18;
+      if (!d || d.funding.mode !== "paid") { setMsg({ kind: "ok", text: `Claimed ${eth.toFixed(5)} ETH to your wallet. This Pito runs in free mode, so compute needs no funding.` }); await load(); return; }
+      if (!fees.native) { setMsg({ kind: "ok", text: `Claimed. These fees are not in ETH; fund the machine with ETH below.` }); await load(); return; }
+      setMsg({ kind: "ok", text: `Claimed ${eth.toFixed(5)} ETH. Now confirm the compute payment of the same amount.` });
+      const fundHash = await sendEth(d.funding.treasury, claimed, "0x" + m.id.replace(/-/g, ""));
+      setMsg({ kind: "ok", text: `Payment sent (${fundHash.slice(0, 10)}…). Waiting for 2 confirmations…` });
+      for (let i = 0; i < 60; i++) {
+        const r = await fetch(`/api/machines/${m.id}/deposit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ txHash: fundHash }) });
+        const j = await r.json();
+        if (r.status === 202) { await new Promise((res) => setTimeout(res, 8000)); continue; }
+        if (!r.ok) throw new Error(j?.error?.message || "Payment could not be credited.");
+        setMsg({ kind: "ok", text: `Creator fees turned into compute: $${(j.cents / 100).toFixed(2)} credited.${j.started ? " The computer is starting." : ""}` }); await load(); return;
+      }
+      setMsg({ kind: "err", text: `Still waiting for confirmations. Keep the hash ${fundHash}; fund again with it later to credit.` });
+    } catch (e) { setMsg({ kind: "err", text: errMessage(e) }); }
+    finally { setBusy(""); }
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault(); const body = chat.trim(); if (body.length < 2) return;
     const j = await signed(`/api/machines/${m.id}/messages`, "message", m.id, { body, kind }, "chat");
@@ -250,6 +284,16 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
             <div className="feed" style={{ maxHeight: 160 }}>
               {steps.filter((s) => s.kind === "system").slice(-6).reverse().map((s) => <div key={s.id} className="logline"><div>{s.note}</div><span className="fine">{new Date(s.created_at).toLocaleString()}</span></div>)}
             </div>
+            {fees?.available && (
+              <div style={{ display: "grid", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+                <span className="label acc">Creator fees → compute</span>
+                <div className="row"><span className="fine">Claimable in the coin&apos;s ledger</span><span className="mono">{(Number(fees.claimable_wei ?? "0") / 1e18).toFixed(5)} ETH</span></div>
+                {isCreator || (account && fees.creator?.toLowerCase() === account) ? (
+                  <button className="btn primary small" type="button" disabled={!!busy || Number(fees.claimable_wei ?? "0") === 0} onClick={claimAndFund}>{busy === "fees" ? "Working…" : d?.funding.mode === "paid" ? "Claim fees & fund compute" : "Claim creator fees"}</button>
+                ) : <span className="fine">Only the fee recipient wallet can claim.</span>}
+                <span className="fine">{fees.note}</span>
+              </div>
+            )}
             {d?.funding.mode === "paid" && pricePerHour > 0 && (
               <div style={{ display: "grid", gap: 8 }}>
                 <span className="label acc">Fund compute · anyone can</span>
