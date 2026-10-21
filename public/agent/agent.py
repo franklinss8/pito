@@ -48,10 +48,20 @@ Rules: never ask for or handle private keys; never promise prices, returns or ai
 no illegal content. Holder requests: bugs are fixed right away; features need 3 votes (status 'approved');
 major new mechanisms need 10. Only work on requests with status 'approved' (or bugs). Reply briefly and honestly.
 
-Reply with ONE JSON object only, no prose, of the form:
+Reply with ONE JSON object, no prose, of the form below. For write_file, do NOT put the file content inside the JSON:
+put the JSON first, then the whole file content in a fenced block that starts with a line ```file and ends with a line ```.
+
+Example:
+{"thought": "create the page", "action": {"type": "write_file", "path": "/workspace/app/index.html"}}
+```file
+<!doctype html>
+<html>...</html>
+```
+
+The JSON object:
 {"thought": "short reasoning",
  "action": {"type": "shell", "command": "..."}                               // run a shell command (timeout 180 s)
-        | {"type": "write_file", "path": "/workspace/app/index.html", "content": "..."}   // write a file
+        | {"type": "write_file", "path": "/workspace/app/index.html"}   // then the content in a ```file block
         | {"type": "plan", "summary": "...", "stage": "setup|plan|build|test|ship", "progress": 0-100, "current_task": "...", "milestones": [{"title": "...", "done": false}]}
         | {"type": "reply", "message_id": "...", "body": "..."}              // answer a holder
         | {"type": "request_status", "message_id": "...", "status": "built|declined"}
@@ -76,9 +86,23 @@ def context(state):
     return "\n\n".join(parts)
 
 def parse(text):
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m: raise ValueError("no json")
-    return json.loads(m.group(0))
+    """JSON first (control characters inside strings tolerated), optional ```file block after it."""
+    fence = re.search(r"```file[^\n]*\n(.*?)\n```", text, re.S)
+    head = text[:fence.start()] if fence else text
+    head = re.sub(r"```(?:json)?", "", head)
+    start = head.find("{")
+    if start == -1: raise ValueError("no json")
+    dec = json.JSONDecoder(strict=False)
+    obj = None
+    for end in range(len(head), start, -1):
+        try: obj = dec.decode(head[start:end]); break
+        except ValueError: continue
+    if obj is None: raise ValueError("bad json")
+    a = obj.get("action") or {}
+    if a.get("type") == "write_file" and "content" not in a:
+        if not fence: raise ValueError("write_file without content")
+        a["content"] = fence.group(1)
+    return obj
 
 # ---------- acting ----------
 def run(cmd):
@@ -130,6 +154,20 @@ def health():
     try: return requests.get("http://127.0.0.1:8080/", timeout=5).status_code < 500
     except Exception: return False
 
+# ---------- self-update: exit when Pito publishes a newer agent (bootstrap re-downloads it) ----------
+_last_update_check = 0
+def maybe_update():
+    global _last_update_check
+    if time.time() - _last_update_check < 300: return
+    _last_update_check = time.time()
+    try:
+        latest = requests.get(f"{API}/agent/agent.py", timeout=30).text
+        if latest.strip() and latest != Path(__file__).read_text():
+            step("system", note="Agent update available. Restarting with the new version; work files kept.")
+            raise SystemExit(0)
+    except SystemExit: raise
+    except Exception: pass
+
 # ---------- main loop ----------
 def main():
     step("system", note=f"AI online ({MODEL}). Reading the mission.")
@@ -149,9 +187,11 @@ def main():
             history += [{"role": "assistant", "content": json.dumps(a)[:3000]}, {"role": "user", "content": f"Result: {str(result)[:3000]}"}]
             if time.time() - last_frame > FRAME_EVERY: frame(); last_frame = time.time()
             time.sleep(3 if a.get("action", {}).get("type") in ("shell", "write_file") else LOOP_SLEEP)
+            maybe_update()
         except SystemExit: raise
-        except Exception:
-            print(traceback.format_exc()); step("system", note="Worker hiccup; retrying."); time.sleep(30)
+        except Exception as e:
+            print(traceback.format_exc()); step("system", note=f"Worker hiccup ({type(e).__name__}: {str(e)[:100]}); retrying."); time.sleep(15)
+        maybe_update()
 
 if __name__ == "__main__":
     main()
