@@ -18,7 +18,21 @@ export default function HowItWorks() {
       <div className="label acc">How it works</div>
       <h1 style={{ fontSize: "clamp(38px,6vw,64px)", margin: "10px 0 14px" }}>A token with its own computer.</h1>
       <p className="sub" style={{ fontSize: 15 }}>Every Pito token comes with a GPU and an AI that builds what the creator describes, for holders to watch and use.</p>
-      <div className="bench" style={{ marginTop: 28 }}>
+
+      <section className="why">
+        <h2>Why a token?</h2>
+        <p className="why-lede">You don&apos;t need a token to use an AI. You need one to let a crowd own what it builds.</p>
+        <p>An AI can build a tool for anyone with a credit card. The hard part is what comes after: a product that runs 24/7 on a GPU costs money every hour, somebody has to decide what it builds next, and somebody has to care enough to use it and tell others. Companies solve this with a business. Pito solves it with a coin.</p>
+        <div className="why-grid">
+          <div><span className="label acc">01 · It pays</span><p>Every trade of the coin generates creator fees. Those fees fund the machine. The more people care about the tool, the more it trades, the more compute it has. No subscription, no publisher, no invoice.</p></div>
+          <div><span className="label acc">02 · It decides</span><p>Who steers the AI? The people with something at stake. Holding the coin is the verifiable ticket to talk to the machine, report bugs and vote on features. One wallet, one voice, checked onchain. No accounts, no moderators, no owner.</p></div>
+          <div><span className="label acc">03 · It aligns</span><p>Holders want the tool to be good and known, because its success shows in the coin. They test it, promote it and argue about it for free. A subscriber has no reason to do any of that.</p></div>
+        </div>
+        <p className="why-sum"><b>The coin is how a crowd funds, steers and promotes a product built by an AI, with no company in the middle.</b> The GPU and the agent are the how. The token is the why together.</p>
+      </section>
+
+      <h2 style={{ fontSize: 28, margin: "40px 0 12px" }}>The seven steps</h2>
+      <div className="bench">
         {STEPS.map(([t, p], i) => (
           <div className="step" key={t}><div className="num">{String(i + 1).padStart(2, "0")}</div><div><h3>{t}</h3><p className="sub" style={{ margin: 0 }}>{p}</p></div></div>
         ))}

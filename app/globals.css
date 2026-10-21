@@ -304,3 +304,15 @@ select:focus{outline:none;border-color:var(--acc)}
 .pl-tokencard{display:grid;grid-template-columns:72px 1fr;gap:16px;align-items:start;border:1px solid var(--line);background:var(--bg);padding:16px;border-radius:12px;margin-bottom:8px}
 .pl-tokencard img{width:72px;height:72px;object-fit:cover;border-radius:12px;display:block}
 .pl-tokenph{width:72px;height:72px;border-radius:12px;border:1px dashed var(--muted);display:grid;place-items:center;color:var(--muted);font-size:28px}
+
+/* ---- why a token ---- */
+.why{margin-top:32px;border:1px solid var(--line);background:var(--panel);padding:28px}
+.why h2{font-size:28px;margin:0 0 10px}
+.why p{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 14px;max-width:70ch}
+.why .why-lede{color:var(--fg);font-size:17px;font-family:var(--f-display);font-weight:500}
+.why-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:20px 0}
+.why-grid>div{border-top:1px solid var(--line);padding-top:12px}
+.why-grid .label{display:block;margin-bottom:8px}
+.why-grid p{margin:0}
+.why .why-sum{color:var(--fg);margin:0}
+@media (max-width:860px){.why-grid{grid-template-columns:1fr}}
