@@ -168,8 +168,8 @@ def maybe_update():
     if time.time() - _last_update_check < 300: return
     _last_update_check = time.time()
     try:
-        latest = requests.get(f"{API}/agent/agent.py", timeout=30).text
-        if latest.strip() and latest != Path(__file__).read_text():
+        latest = requests.get(f"{API}/agent/agent.py", timeout=30).content
+        if len(latest) > 1000 and latest.replace(b"\r\n", b"\n") != Path(__file__).read_bytes().replace(b"\r\n", b"\n"):
             step("system", note="Agent update available. Restarting with the new version; work files kept.")
             raise SystemExit(0)
     except SystemExit: raise

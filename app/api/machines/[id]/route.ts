@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { fail, handleError, ok } from "@/lib/http";
-import { counts, getMachine, remainingCents } from "@/lib/machines";
+import { counts, getMachine, remainingCents, tickMachine } from "@/lib/machines";
 import { refreshMarket } from "@/lib/market";
 
 export const runtime = "nodejs";
@@ -10,8 +10,12 @@ export const dynamic = "force-dynamic";
 /** Everything the project page needs, in one call. */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   try {
-    const m = await getMachine(params.id);
+    let m = await getMachine(params.id);
     if (!m) return fail(404, "not_found", "No machine with this id.");
+    if (m.pod_id && ["starting", "running"].includes(m.status) && (!m.last_billed_at || Date.now() - Date.parse(m.last_billed_at) > 5 * 60_000)) {
+      await tickMachine(m).catch(() => {});
+      m = (await getMachine(params.id)) ?? m;
+    }
     const cap = await refreshMarket(m).catch(() => null);
     if (cap !== null) m.market_cap_usd = cap;
     const [{ ai_steps, holder_messages }, steps, messages] = await Promise.all([
