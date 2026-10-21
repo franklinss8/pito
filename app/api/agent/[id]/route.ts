@@ -18,7 +18,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       db().from("steps").select("kind,command,output,note,created_at").eq("machine_id", m.id).order("created_at", { ascending: false }).limit(12),
     ]);
     return ok({
-      machine: { id: m.id, name: m.name, symbol: m.symbol, description: m.description, mission: m.mission, token_address: m.token_address, template: getTemplate(m.template_id), ai_model: m.ai_model, app_url: m.app_url, status: m.status },
+      machine: { id: m.id, name: m.name, symbol: m.symbol, description: m.description, mission: m.mission, token_address: m.token_address, template: getTemplate(m.template_id), ai_model: m.ai_model, app_url: m.app_url, status: m.status, mode: m.template_id === "anything-api" ? "api" : "token" },
       plan: m.plan,
       pending_messages: pending ?? [],
       approved_requests: approved ?? [],

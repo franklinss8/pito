@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       await addStep(m.id, { kind: "system", note: "Computer stopped by the creator." });
       return ok({ status: "stopped" });
     }
-    if (!m.token_address) return fail(409, "not_bound", "Bind the token first.");
+    if (!m.token_address && m.template_id !== "anything-api") return fail(409, "not_bound", "Bind the token first.");
     if (remainingCents(m) <= 0) return fail(402, "no_budget", "No compute budget. Fund the machine first.");
     if (m.pod_id) {
       const pod = await getPod(m.pod_id).catch(() => null);

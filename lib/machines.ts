@@ -11,7 +11,7 @@ export async function getMachine(id: string): Promise<Machine | null> {
 }
 
 export async function listMachines(opts: { sort?: "new" | "mcap"; limit?: number; offset?: number; liveOnly?: boolean } = {}): Promise<Machine[]> {
-  let q = db().from("machines").select(PUBLIC_MACHINE_COLUMNS);
+  let q = db().from("machines").select(PUBLIC_MACHINE_COLUMNS).neq("template_id", "anything-api");
   if (opts.liveOnly) q = q.not("token_address", "is", null);
   q = opts.sort === "mcap" ? q.order("market_cap_usd", { ascending: false, nullsFirst: false }) : q.order("created_at", { ascending: false });
   const limit = Math.min(100, Math.max(1, opts.limit ?? 25)), offset = Math.max(0, opts.offset ?? 0);

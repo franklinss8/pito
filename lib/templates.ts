@@ -60,9 +60,13 @@ export const TEMPLATES: Template[] = [
   { id: "swarmui", name: "SwarmUI", category: "Image AI", diskGb: 40, desc: "Modular image generation interface.", image: PT, setup: clone("https://github.com/mcmonkeyprojects/SwarmUI", "SwarmUI", "true") },
 ];
 
+/** Hidden kind: an Originals "Anything API" machine. Not a token machine; built and hosted for one wallet. */
+export const ANYTHING_API: Template = { id: "anything-api", name: "Anything API", category: "Dev base", diskGb: 40, desc: "An HTTP API built, tested and hosted by the machine from a description.", image: PT, setup: "" };
+export const isApiMachine = (templateId: string) => templateId === "anything-api";
+
 export const NO_TEMPLATE: Template = { id: "none", name: "No template", category: "Dev base", diskGb: 40, desc: "Clean PyTorch base. The AI installs what it needs.", image: PT, setup: "" };
 
-export function getTemplate(id: string): Template { return TEMPLATES.find((t) => t.id === id) ?? NO_TEMPLATE; }
+export function getTemplate(id: string): Template { return id === ANYTHING_API.id ? ANYTHING_API : (TEMPLATES.find((t) => t.id === id) ?? NO_TEMPLATE); }
 
 /** AI models the agent can run with. */
 export const AI_MODELS = [

@@ -13,6 +13,7 @@ export default async function Originals() {
     { t: "Cloud Gaming", badge: `preview · ${free}/10 computers free`, p: "Games ready to play on GPU computers, directly in the browser. Opens with the first gaming machines.", href: "/originals/gaming", btn: "Open" },
     { t: "Open Models", badge: models, p: "Selected Hugging Face models hosted on Pito GPUs. Holders of any Pito token chat for free; Pito covers the compute.", href: "/originals/models", btn: "Open", sub: "models from hugging face" },
     { t: "Rent", badge: "pay per hour · ETH", p: "Rent a Pito computer as your own workspace. Isolated, full access, Jupyter and a terminal in the browser.", href: "/rent", btn: "Rent" },
+    { t: "Anything API", badge: "live · pay per hour", p: "Describe what you need an API to do. A Pito machine figures out the flow, connects the services, tests everything, and gives you one working endpoint. Combine several APIs into one.", href: "/originals/anything-api", btn: "Open" },
     { t: "Automation", badge: "private · wallet-owned", p: "Brainstorm with your own agent, fund its wallet, and review its orders. Built on the same machines.", href: "/originals/automation", btn: "Open" },
   ];
   return (

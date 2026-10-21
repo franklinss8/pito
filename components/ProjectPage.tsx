@@ -48,6 +48,7 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
   const state = machineState(m);
   const online = d?.stats.online ?? false;
   const tpl = getTemplate(m.template_id);
+  const isApi = m.template_id === "anything-api";
   const model = AI_MODELS.find((x) => x.id === m.ai_model)?.name ?? m.ai_model;
   const remaining = d?.stats.remaining_cents ?? 0;
   const pricePerHour = m.price_cents_per_hour;
@@ -146,7 +147,7 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
             {m.image_url ? <img src={m.image_url} alt="" width={56} height={56} style={{ width: 56, height: 56, objectFit: "cover", border: "1px solid var(--line)" }} /> : null}
             <div><div className="ticker" style={{ fontSize: 40 }}>{m.name} <span style={{ color: "var(--acc)" }}>${m.symbol}</span></div><div className="name">{m.description || m.mission}</div></div>
           </div>
-          <div className="fine">Holders steer this project: chat with the AI, suggest ideas, vote on features. Fixes are built right away; features need 3 votes; major new mechanisms need 10.</div>
+          <div className="fine">{isApi ? "Anything API: this machine builds and hosts one HTTP API for its owner. Messages below are instructions to the builder." : "Holders steer this project: chat with the AI, suggest ideas, vote on features. Fixes are built right away; features need 3 votes; major new mechanisms need 10."}</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <StatusDot m={m} />
             {m.token_address && <button className="btn small" type="button" onClick={() => copy(m.token_address!, "Contract address")}>Copy CA</button>}
@@ -318,10 +319,12 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
           </div>
         </div>
         <div>
-          <div className="section-num">05 · The app</div>
+          <div className="section-num">{isApi ? "05 · The endpoint" : "05 · The app"}</div>
           <div className="panel">
             <div className="row"><span className="label">Status</span><StatusDot m={m} /></div>
-            <div className="fine">{m.app_updated_at ? `Shipped ${new Date(m.app_updated_at).toLocaleString()}. The app runs on the machine's own computer.` : "The link works once the app ships."}</div>
+            <div className="fine">{m.app_updated_at ? `${isApi ? "Live" : "Shipped"} ${new Date(m.app_updated_at).toLocaleString()}. ${isApi ? "Base URL below; interactive docs at /docs." : "The app runs on the machine's own computer."}` : isApi ? "The endpoint goes live once the machine has built and tested it." : "The link works once the app ships."}</div>
+            {isApi && m.app_url && <div className="mono fine" style={{ overflowWrap: "anywhere" }}>{m.app_url}</div>}
+            {isApi && m.app_updated_at && m.app_url && <a className="btn block primary" href={`${m.app_url}/docs`} target="_blank" rel="noopener noreferrer">Open the docs ↗</a>}
             <div className="mono fine" style={{ overflowWrap: "anywhere" }}>{origin}/app/{m.id}</div>
             <a className={`btn block ${m.app_updated_at ? "primary" : ""}`} href={`/app/${m.id}`} target="_blank" rel="noopener" aria-disabled={!m.app_updated_at}>Open the app ↗</a>
             {m.app_updated_at && m.app_url && <iframe className="appframe" src={m.app_url} title={`$${m.symbol} app`} sandbox="allow-scripts allow-forms allow-same-origin allow-popups" style={{ height: 420, minHeight: 0 }} />}

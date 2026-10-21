@@ -70,6 +70,13 @@ The JSON object:
         | {"type": "idle", "seconds": 60}                                    // nothing useful to do right now
 }"""
 
+API_MODE = """MODE: Anything API. This machine is not a token machine: it belongs to one person who described an HTTP API.
+Build exactly that API and host it on port 8080 (replace the static server with your own: FastAPI/uvicorn or Node/Express).
+Requirements: JSON responses; CORS open; a GET / that returns a short JSON description with the routes;
+interactive docs at /docs (FastAPI gives it for free) or a /openapi.json; handle errors with proper status codes;
+test every route with curl before declaring app_live. Keep the server running (nohup) and restart it if it dies.
+There are no holders here: 'approved_requests' and 'pending_messages' come from the owner; treat them as instructions."""
+
 def context(state):
     m = state["machine"]; plan = state.get("plan")
     parts = [f"Token: {m['name']} (${m['symbol']}) — {m.get('description') or ''}",
@@ -181,7 +188,8 @@ def main():
             if state["machine"]["status"] in ("stopped", "error"): time.sleep(60); continue
             history = history[-8:]
             msgs = history + [{"role": "user", "content": context(state) + "\n\nDecide the next single action."}]
-            raw = think(SYSTEM, msgs)
+            system = SYSTEM + ("\n\n" + API_MODE if state["machine"].get("mode") == "api" else "")
+            raw = think(system, msgs)
             a = parse(raw)
             result = act(a.get("action", {"type": "idle", "seconds": 60}))
             history += [{"role": "assistant", "content": json.dumps(a)[:3000]}, {"role": "user", "content": f"Result: {str(result)[:3000]}"}]

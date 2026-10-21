@@ -49,7 +49,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // Auto-start when the token is bound and the computer is not running.
     let started = false;
     const fresh = { ...m, budget_cents: m.budget_cents + cents };
-    if (fresh.token_address && ["bound", "stopped", "error"].includes(fresh.status) && remainingCents(fresh) > 0 && fresh.gpu_type_id) started = (await startComputer(fresh)).ok;
+    if ((fresh.token_address || fresh.template_id === "anything-api") && ["bound", "stopped", "error"].includes(fresh.status) && remainingCents(fresh) > 0 && fresh.gpu_type_id) started = (await startComputer(fresh)).ok;
     return ok({ status: "credited", cents, started });
   } catch (e) { return handleError(e); }
 }
