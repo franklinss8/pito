@@ -316,6 +316,16 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
                 {remaining <= 0 && <span className="fine">No budget left.</span>}
               </div>
             )}
+            {isCreator && m.status !== "running" && m.status !== "starting" && (
+              <div className="fine" style={{ marginTop: 14 }}>
+                <button type="button" className="linkbtn" disabled={!!busy} onClick={async () => {
+                  if (!confirm(`Delete ${m.name} ($${m.symbol})? Its page, steps, messages and hosted app disappear. This cannot be undone.`)) return;
+                  toast("Sign in your wallet to delete the machine (no gas).");
+                  const j = await signed(`/api/machines/${m.id}/delete`, "delete", m.id, {}, "delete");
+                  if (j?.deleted) { toast("Machine deleted."); location.href = "/"; }
+                }}>{busy === "delete" ? "Deleting…" : "Delete this machine"}</button>
+              </div>
+            )}
             {msg && <div className={msg.kind === "err" ? "err" : "okmsg"} role={msg.kind === "err" ? "alert" : "status"}>{msg.text}</div>}
           </div>
         </div>
