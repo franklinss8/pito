@@ -31,6 +31,8 @@ export const env = {
   get freeHours(): number { const n = Number(process.env.PITO_FREE_HOURS ?? "2"); return Number.isFinite(n) && n >= 0 ? n : 2; },
   get requireProgrammable(): boolean { return (process.env.PITO_REQUIRE_PROGRAMMABLE ?? "true") !== "false"; },
   /** Pito margin on GPU prices, in percent. */
+  /** Machine ids kept off every public list (operator tests). Their pages still open by direct link. */
+  get hiddenMachines(): string[] { return (process.env.PITO_HIDDEN_MACHINES || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean); },
   get marginPct(): number { const n = Number(process.env.PITO_MARGIN_PCT ?? "20"); return Number.isFinite(n) ? n : 20; },
   get houseModelUrl() { return process.env.PITO_HOUSE_MODEL_URL || ""; },
   get houseModelName() { return process.env.PITO_HOUSE_MODEL_NAME || "qwen2.5-coder:14b"; },
