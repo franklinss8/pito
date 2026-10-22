@@ -1,7 +1,7 @@
 import "server-only";
 import { db, PUBLIC_MACHINE_COLUMNS, UUID_RE, type Machine, type Step } from "./db";
 import { env } from "./env";
-import { createPod, getPod, priceCents, proxyUrl, resumePod, stopPod, terminatePod } from "./runpod";
+import { createPod, getPod, listGpuTypes, priceCents, proxyUrl, resumePod, stopPod, terminatePod } from "./runpod";
 import { getTemplate } from "./templates";
 
 export async function getMachine(id: string): Promise<Machine | null> {
@@ -65,18 +65,27 @@ export async function startComputer(m: Machine): Promise<{ ok: true; podId: stri
   const boot = `export DEBIAN_FRONTEND=noninteractive; command -v curl >/dev/null || (apt-get update -q && apt-get install -yq curl ca-certificates) >/dev/null 2>&1; (${tpl.setup || "true"}) > /workspace/setup.log 2>&1; curl -fsSL "$PITO_API/agent/bootstrap.sh" | bash`;
   if (m.pod_id) await terminatePod(m.pod_id).catch(() => {}); // the previous computer (if any) is replaced, not left billing its volume
   try {
-    const { id } = await createPod({
-      name: `pito-${m.symbol || "machine"}-${m.id.slice(0, 8)}`,
-      gpuTypeId: m.gpu_type_id,
-      cloudType: m.cloud_type === "SECURE" ? "SECURE" : "COMMUNITY",
-      image: tpl.image,
-      startCommand: boot,
-      diskGb: Math.max(40, tpl.diskGb),
-      volumeGb: Math.max(40, tpl.diskGb),
+    const cloudType = m.cloud_type === "SECURE" ? "SECURE" : "COMMUNITY";
+    const spec = (gpuTypeId: string) => ({
+      name: `pito-${m.symbol || "machine"}-${m.id.slice(0, 8)}`, gpuTypeId, cloudType: cloudType as "SECURE" | "COMMUNITY", image: tpl.image, startCommand: boot,
+      diskGb: Math.max(40, tpl.diskGb), volumeGb: Math.max(40, tpl.diskGb),
       env: { PITO_API: env.siteUrl, PITO_MACHINE_ID: m.id, PITO_AGENT_TOKEN: secret?.agent_token ?? "", PITO_AI_MODEL: m.ai_model, PITO_TEMPLATE: tpl.id },
     });
-    await db().from("machines").update({ pod_id: id, pod_status: "CREATED", status: "starting", app_url: proxyUrl(id, 8080), agent_started_at: new Date().toISOString(), last_billed_at: new Date().toISOString() }).eq("id", m.id);
-    await addStep(m.id, { kind: "system", note: `Computer rented (${m.gpu_name || m.gpu_type_id}). Installing ${tpl.name}, screen share and the AI.` });
+    let id: string, gpu = { id: m.gpu_type_id, name: m.gpu_name, vram: m.vram_gb, price: m.price_cents_per_hour };
+    try { ({ id } = await createPod(spec(m.gpu_type_id))); }
+    catch (e) {
+      // The chosen GPU is sold out right now: fall back to the cheapest available one with at least as much VRAM (capped at the 24 GB class).
+      if (!/no longer any instances|not available|no GPU/i.test(e instanceof Error ? e.message : "")) throw e;
+      const need = Math.min(m.vram_gb || 24, 24);
+      const alt = (await listGpuTypes()).filter((g) => g.available && g.id !== m.gpu_type_id && g.memoryInGb >= need && (cloudType === "SECURE" ? g.securePriceUsd : g.pricePerHourUsd))
+        .sort((a, b) => (cloudType === "SECURE" ? a.securePriceUsd! - b.securePriceUsd! : a.pricePerHourUsd! - b.pricePerHourUsd!))[0];
+      if (!alt) throw e;
+      ({ id } = await createPod(spec(alt.id)));
+      gpu = { id: alt.id, name: alt.displayName, vram: alt.memoryInGb, price: priceCents((cloudType === "SECURE" ? alt.securePriceUsd : alt.pricePerHourUsd)!) };
+      await addStep(m.id, { kind: "system", note: `${m.gpu_name || m.gpu_type_id} is sold out right now; switched to ${alt.displayName} (${alt.memoryInGb} GB, $${(gpu.price / 100).toFixed(2)}/h).` });
+    }
+    await db().from("machines").update({ pod_id: id, pod_status: "CREATED", status: "starting", app_url: proxyUrl(id, 8080), agent_started_at: new Date().toISOString(), last_billed_at: new Date().toISOString(), gpu_type_id: gpu.id, gpu_name: gpu.name, vram_gb: gpu.vram, price_cents_per_hour: gpu.price }).eq("id", m.id);
+    await addStep(m.id, { kind: "system", note: `Computer rented (${gpu.name || gpu.id}). Installing ${tpl.name}, screen share and the AI.` });
     return { ok: true, podId: id };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Could not rent a computer.";

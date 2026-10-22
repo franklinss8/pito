@@ -314,6 +314,7 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
                 {(m.status === "running" || m.status === "starting") ? <button className="btn" type="button" disabled={!!busy} onClick={() => signed(`/api/machines/${m.id}/power`, "stop", m.id, { op: "stop" }, "power")}>Stop computer</button>
                   : <button className="btn primary" type="button" disabled={!!busy || remaining <= 0} onClick={() => signed(`/api/machines/${m.id}/power`, "resume", m.id, { op: "resume" }, "power")}>{m.pod_id ? "Resume computer" : "Start computer"}</button>}
                 {remaining <= 0 && <span className="fine">No budget left.</span>}
+                {m.status === "error" && remaining > 0 && <span className="fine">Last attempt failed: {m.pod_status || "unknown error"}. Start again; if that GPU is sold out, Pito picks the cheapest available one with the same memory.</span>}
               </div>
             )}
             {isCreator && m.status !== "running" && m.status !== "starting" && (
