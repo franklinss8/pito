@@ -54,7 +54,7 @@ nav.links a:hover{color:var(--acc)}
 
 /* ---- hero ---- */
 .hero{position:relative;border-bottom:1px solid var(--line);overflow:hidden}
-.hero .wrap{position:relative;min-height:640px;display:grid;grid-template-columns:minmax(0,520px) 1fr;padding-block:56px 48px}
+.hero .wrap{position:relative;min-height:640px;display:grid;grid-template-columns:minmax(0,520px) 1fr;padding-block:56px 84px}
 .hero canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 .hero .copy{position:relative;z-index:1}
 .hero .eyebrow{color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
@@ -65,7 +65,7 @@ nav.links a:hover{color:var(--acc)}
 .ctas{display:flex;gap:12px;flex-wrap:wrap}
 .corner{position:absolute;z-index:1;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);line-height:1.6;max-width:200px}
 .corner.tr{top:20px;right:0;text-align:right}
-.corner.ml{left:0;top:52%}
+.corner.ml{left:0;bottom:22px;top:auto}
 .corner.mr{right:0;top:52%;text-align:right}
 @media (max-width:1180px){.corner.ml,.corner.mr{display:none}}
 .corner.bl{left:0;bottom:24px}
