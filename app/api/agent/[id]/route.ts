@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { UUID_RE, db } from "@/lib/db";
 import { agentMachine } from "@/lib/agent-auth";
 import { fail, handleError, ok, readJson, str } from "@/lib/http";
 import { addStep, remainingCents } from "@/lib/machines";
@@ -54,7 +54,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return ok({ saved: true });
     }
     if (type === "reply") {
-      const replyTo = str(b.reply_to, 40) || null, body = str(b.body, 2000);
+      const replyRaw = str(b.reply_to, 40), replyTo = UUID_RE.test(replyRaw) ? replyRaw : null, body = str(b.body, 2000);
       if (!body) return fail(400, "bad_body", "Empty reply.");
       await db().from("messages").insert({ machine_id: m.id, wallet: "ai", body, is_ai: true, reply_to: replyTo, ai_replied: true });
       if (replyTo) await db().from("messages").update({ ai_replied: true }).eq("id", replyTo).eq("machine_id", m.id);

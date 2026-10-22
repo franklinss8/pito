@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
 import { verifyAction } from "@/lib/auth";
 import { fail, handleError, ok, readJson } from "@/lib/http";
-import { addStep, getMachine, remainingCents, startComputer } from "@/lib/machines";
-import { getPod, resumePod, stopPod } from "@/lib/runpod";
+import { addStep, getMachine, remainingCents, startComputer, tickMachine } from "@/lib/machines";
+import { stopPod } from "@/lib/runpod";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +20,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     if (op === "stop") {
       if (!m.pod_id) return fail(409, "no_computer", "This machine has no computer yet.");
+      await tickMachine(m).catch(() => {}); // bill the last minutes before the pod sleeps
       await stopPod(m.pod_id);
       await db().from("machines").update({ status: "stopped", pod_status: "EXITED" }).eq("id", m.id);
       await addStep(m.id, { kind: "system", note: "Computer stopped by the creator." });
@@ -27,18 +28,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
     if (!m.token_address && m.template_id !== "anything-api") return fail(409, "not_bound", "Bind the token first.");
     if (remainingCents(m) <= 0) return fail(402, "no_budget", "No compute budget. Fund the machine first.");
-    if (m.pod_id) {
-      const pod = await getPod(m.pod_id).catch(() => null);
-      if (pod && pod.desiredStatus !== "RUNNING") {
-        try {
-          await resumePod(m.pod_id);
-          await db().from("machines").update({ status: "starting", pod_status: "RESUMED", last_billed_at: new Date().toISOString() }).eq("id", m.id);
-          await addStep(m.id, { kind: "system", note: "Computer resumed. Work files kept." });
-          return ok({ status: "starting" });
-        } catch { /* fall through: rent a fresh one */ }
-      } else if (pod) return ok({ status: "running" });
-    }
-    const r = await startComputer(m);
+    if (m.status === "running" || m.status === "starting") return ok({ status: m.status });
+    const r = await startComputer(m); // resumes the existing computer, or rents a fresh one
     if (!r.ok) return fail(502, "start_failed", r.error);
     return ok({ status: "starting", podId: r.podId });
   } catch (e) { return handleError(e); }

@@ -29,12 +29,14 @@ def report(**body):
 def step(kind, **kw): report(type="step", kind=kind, **kw)
 
 # ---------- thinking ----------
+class NoBudget(Exception): pass
+
 def think(system, messages):
     if MODEL.startswith("local:"):
         r = requests.post("http://127.0.0.1:11434/v1/chat/completions", json={"model": MODEL[6:], "messages": [{"role": "system", "content": system}] + messages, "max_tokens": 3000, "temperature": 0.3}, timeout=600)
         r.raise_for_status(); return r.json()["choices"][0]["message"]["content"]
     r = requests.post(f"{API}/api/agent/{MID}/llm", headers=H, json={"system": system, "messages": messages, "max_tokens": 4000}, timeout=150)
-    if r.status_code == 402: raise SystemExit("budget exhausted")
+    if r.status_code == 402: raise NoBudget()
     r.raise_for_status(); return r.json()["text"]
 
 SYSTEM = """You are the AI running a Pito machine: a GPU computer that belongs to one crypto token on Ethereum.
@@ -194,7 +196,7 @@ def health():
     except Exception: return False
 
 # ---------- self-update: exit when Pito publishes a newer agent (bootstrap re-downloads it) ----------
-_last_update_check = 0
+_last_update_check = time.time()  # bootstrap just downloaded the latest agent: first check in 5 min
 def maybe_update():
     global _last_update_check
     if time.time() - _last_update_check < 300: return
@@ -227,9 +229,13 @@ def main():
             history += [{"role": "assistant", "content": json.dumps(a)[:3000]}, {"role": "user", "content": f"Result: {str(result)[:3000]}"}]
             if time.time() - last_frame > FRAME_EVERY: frame(); last_frame = time.time()
             if time.time() - last_snap > 300: snapshot(); last_snap = time.time()
-            time.sleep(3 if a.get("action", {}).get("type") in ("shell", "write_file") else LOOP_SLEEP)
+            t = a.get("action", {}).get("type")
+            shipped = (state["machine"].get("plan") or {}).get("progress", 0) >= 100 and state["machine"].get("app_updated_at")
+            time.sleep(3 if t in ("shell", "write_file") else (120 if (t == "idle" and shipped) else LOOP_SLEEP))
             maybe_update()
         except SystemExit: raise
+        except NoBudget:
+            time.sleep(180); continue  # Pito stops the pod shortly; if it is funded again we simply resume
         except Exception as e:
             print(traceback.format_exc()); step("system", note=f"Worker hiccup ({type(e).__name__}: {str(e)[:100]}); retrying."); time.sleep(15)
         maybe_update()

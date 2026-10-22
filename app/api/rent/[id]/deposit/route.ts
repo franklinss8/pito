@@ -32,14 +32,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       if ((tx.to ?? "").toLowerCase() !== treasury) return fail(422, "wrong_recipient", "That transaction did not pay the Pito treasury.");
       if (tx.input.toLowerCase() !== "0x" + rental.id.replace(/-/g, "")) return fail(422, "wrong_rental", "That payment is not tagged for this rental.");
       const cents = weiToCents(tx.value, await ethUsd());
-      if (cents < 100) return fail(422, "too_small", "Minimum $1.");
       const { error } = await db().from("deposits").insert({ tx_hash: txHash, rental_id: rental.id, from_address: tx.from.toLowerCase(), value_wei: tx.value.toString(), cents });
       if (error && (error as { code?: string }).code !== "23505") throw error;
       if (!error) await db().rpc("add_rental_budget", { p_rental: rental.id, p_cents: cents });
     }
     const { data: fresh } = await db().from("rentals").select("*").eq("id", rental.id).single();
     const rr = fresh as Rental;
-    if (rr.status === "pending" && rr.budget_cents > rr.spent_cents) {
+    if (["pending", "error"].includes(rr.status) && rr.budget_cents > rr.spent_cents) {
       const tpl = getTemplate(rr.template_id);
       const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) => x.toString(16).padStart(2, "0")).join("");
       const boot = `export DEBIAN_FRONTEND=noninteractive; (${tpl.setup || "true"}) > /workspace/setup.log 2>&1; pip install -q jupyterlab >/dev/null 2>&1; jupyter lab --ip=0.0.0.0 --port=8888 --allow-root --no-browser --ServerApp.token=${token} --ServerApp.root_dir=/workspace`;

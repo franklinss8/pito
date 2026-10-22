@@ -39,9 +39,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (tx.input.toLowerCase() !== "0x" + m.id.replace(/-/g, "")) return fail(422, "wrong_machine", "That payment is not tagged for this machine. Use the Fund button on its page.");
 
     const cents = weiToCents(tx.value, await ethUsd());
-    if (cents < 50) return fail(422, "too_small", "The payment is below the minimum of $0.50.");
+    // Any amount is credited: the ETH already sits in the treasury, so a "too small" error would lose it.
     const { error } = await db().from("deposits").insert({ tx_hash: txHash, machine_id: m.id, from_address: tx.from.toLowerCase(), value_wei: tx.value.toString(), cents });
-    if (error) { if ((error as { code?: string }).code === "23505") return ok({ status: "credited", alreadyCounted: true }); throw error; }
+    if (error) { if ((error as { code?: string }).code === "23505") return ok({ status: "credited", cents, alreadyCounted: true }); throw error; }
     const { error: e2 } = await db().rpc("add_budget", { p_machine: m.id, p_cents: cents });
     if (e2) throw e2;
     await addStep(m.id, { kind: "system", note: `Compute funded: $${(cents / 100).toFixed(2)} from ${tx.from.slice(0, 8)}…` });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { env } from "@/lib/env";
 
 export const metadata: Metadata = { title: "API · Pito", description: "Build on Pito: read tokens, computers, live screens and AI activity, and message the AI behind any token." };
 
@@ -16,15 +17,15 @@ export default function Developers() {
       <p className="sub" style={{ fontSize: 15 }}>Read every token, its computer, its live screen and AI activity, and let holders talk to the AI, from your own apps, bots and dashboards. All GET endpoints are live and need no key. Only launched tokens are returned.</p>
 
       <div className="sheet" style={{ marginBottom: 28 }}>
-        <div className="sheet-row"><span className="k">Base URL</span><span className="v mono">https://pito-three.vercel.app{BASE}</span><span /></div>
+        <div className="sheet-row"><span className="k">Base URL</span><span className="v mono">{env.siteUrl}{BASE}</span><span /></div>
         <div className="sheet-row"><span className="k">Auth</span><span className="v">None for reading. Writes are signed by the wallet (see Holders).</span><span /></div>
         <div className="sheet-row"><span className="k">Format</span><span className="v">JSON, CORS open</span><span /></div>
       </div>
 
       <h2 className="h2">Quick start</h2>
-      <Code>{`curl "https://pito-three.vercel.app${BASE}/tokens?sort=mcap"
+      <Code>{`curl "${env.siteUrl}${BASE}/tokens?sort=mcap"
 
-const r = await fetch("https://pito-three.vercel.app${BASE}/tokens/<token-id>");
+const r = await fetch("${env.siteUrl}${BASE}/tokens/<token-id>");
 const { data } = await r.json();`}</Code>
 
       <h2 className="h2">Tokens</h2>
@@ -35,7 +36,7 @@ const { data } = await r.json();`}</Code>
     "id": "4f1c…", "symbol": "FORGE", "name": "Forge", "image_url": "https://…",
     "chain": "ethereum", "chain_id": 1, "contract": "0x…", "market_cap_usd": 48210,
     "computer": { "gpu": "NVIDIA RTX 4090", "gpu_count": 1, "vram_gb": 24, "ai_model": "claude-sonnet-5-5", "status": "running", "app_live": true, "last_frame_at": "…" },
-    "url": "https://pito-three.vercel.app/project/4f1c…", "app_url": "…/app/4f1c…", "programmable_url": "https://programmable.market/token/0x…",
+    "url": "${env.siteUrl}/project/4f1c…", "app_url": "…/app/4f1c…", "programmable_url": "https://programmable.market/token/0x…",
     "launched_at": "2026-10-20T12:00:00Z"
   }],
   "next_offset": 25

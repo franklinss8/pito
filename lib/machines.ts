@@ -1,7 +1,7 @@
 import "server-only";
 import { db, PUBLIC_MACHINE_COLUMNS, UUID_RE, type Machine, type Step } from "./db";
 import { env } from "./env";
-import { createPod, getPod, proxyUrl, stopPod } from "./runpod";
+import { createPod, getPod, priceCents, proxyUrl, resumePod, stopPod, terminatePod } from "./runpod";
 import { getTemplate } from "./templates";
 
 export async function getMachine(id: string): Promise<Machine | null> {
@@ -42,9 +42,26 @@ export async function startComputer(m: Machine): Promise<{ ok: true; podId: stri
   if (!env.hasRunpod) return { ok: false, error: "GPU provider is not configured on this Pito." };
   if (!m.gpu_type_id) return { ok: false, error: "No GPU selected." };
   if (remainingCents(m) <= 0) return { ok: false, error: "No compute budget. Fund the machine first." };
+  // One pod per machine: only the caller that flips the status to "starting" rents.
+  const { data: claimed } = await db().from("machines").update({ status: "starting", pod_status: "RENTING" }).eq("id", m.id).in("status", ["bound", "stopped", "error"]).select("id");
+  if (!claimed?.length) return { ok: false, error: "The computer is already starting." };
+  // An existing computer is resumed (work files kept) rather than replaced.
+  if (m.pod_id) {
+    const pod = await getPod(m.pod_id).catch(() => null);
+    if (pod?.desiredStatus === "RUNNING") { await db().from("machines").update({ status: "running", pod_status: "RUNNING" }).eq("id", m.id); return { ok: true, podId: m.pod_id }; }
+    if (pod) {
+      try {
+        await resumePod(m.pod_id);
+        await db().from("machines").update({ pod_status: "RESUMED", last_billed_at: new Date().toISOString(), agent_started_at: new Date().toISOString() }).eq("id", m.id);
+        await addStep(m.id, { kind: "system", note: "Computer resumed. Work files kept." });
+        return { ok: true, podId: m.pod_id };
+      } catch { /* no capacity on that host: rent a fresh one below */ }
+    }
+  }
   const { data: secret } = await db().from("machines").select("agent_token").eq("id", m.id).single();
   const tpl = getTemplate(m.template_id);
-  const boot = `export DEBIAN_FRONTEND=noninteractive; (${tpl.setup || "true"}) > /workspace/setup.log 2>&1; curl -fsSL "$PITO_API/agent/bootstrap.sh" | bash`;
+  const boot = `export DEBIAN_FRONTEND=noninteractive; command -v curl >/dev/null || (apt-get update -q && apt-get install -yq curl ca-certificates) >/dev/null 2>&1; (${tpl.setup || "true"}) > /workspace/setup.log 2>&1; curl -fsSL "$PITO_API/agent/bootstrap.sh" | bash`;
+  if (m.pod_id) await terminatePod(m.pod_id).catch(() => {}); // the previous computer (if any) is replaced, not left billing its volume
   try {
     const { id } = await createPod({
       name: `pito-${m.symbol || "machine"}-${m.id.slice(0, 8)}`,
@@ -70,21 +87,26 @@ export async function startComputer(m: Machine): Promise<{ ok: true; podId: stri
 /** Called by the cron: syncs pod status, bills time, stops exhausted machines. */
 export async function tickMachine(m: Machine) {
   if (!m.pod_id || !env.hasRunpod) return;
-  const pod = await getPod(m.pod_id).catch(() => null);
+  const pod = await getPod(m.pod_id); // a provider hiccup throws: the caller skips this tick instead of marking the pod gone
   const now = new Date();
   if (!pod) { await db().from("machines").update({ pod_status: "GONE", status: "stopped" }).eq("id", m.id); return; }
   const running = pod.desiredStatus === "RUNNING";
   const patch: Record<string, unknown> = { pod_status: pod.desiredStatus };
   if (pod.gpuDisplayName && pod.gpuDisplayName !== m.gpu_name) patch.gpu_name = pod.gpuDisplayName;
+  // Bill what the provider actually charges (secure cloud, price changes) plus the margin; never below the quoted price.
+  const live = pod.costPerHr ? priceCents(pod.costPerHr) : 0;
+  const rate = Math.max(m.price_cents_per_hour, live);
+  if (rate !== m.price_cents_per_hour) patch.price_cents_per_hour = rate;
   if (running) {
     const since = m.last_billed_at ? Date.parse(m.last_billed_at) : now.getTime();
     const hours = Math.max(0, now.getTime() - since) / 3_600_000;
-    patch.spent_cents = m.spent_cents + Math.round(hours * m.price_cents_per_hour);
+    patch.spent_cents = m.spent_cents + Math.round(hours * rate);
     patch.last_billed_at = now.toISOString();
-    if (m.status === "starting" && m.last_seen_at) patch.status = "running";
+    if (m.status === "stopped" || (m.status === "starting" && m.last_seen_at)) patch.status = "running";
     const remaining = remainingCents({ ...m, spent_cents: patch.spent_cents as number });
     if (remaining <= 0) {
       await stopPod(m.pod_id).catch(() => {});
+      patch.spent_cents = (patch.spent_cents as number) + remaining; // no debt: the next deposit buys compute, not the past
       patch.status = "stopped"; patch.pod_status = "EXITED";
       await addStep(m.id, { kind: "system", note: "Compute budget used up. The computer was stopped; fund the machine to resume." });
     }
@@ -93,3 +115,17 @@ export async function tickMachine(m: Machine) {
   }
   await db().from("machines").update(patch).eq("id", m.id);
 }
+
+/** Adds a charge (LLM tokens, etc.) to a machine's spend. Optimistic update so concurrent ticks cannot lose it. */
+export async function chargeCents(id: string, cents: number) {
+  if (cents <= 0) return;
+  for (let i = 0; i < 3; i++) {
+    const { data } = await db().from("machines").select("spent_cents").eq("id", id).single();
+    if (!data) return;
+    const { data: upd } = await db().from("machines").update({ spent_cents: data.spent_cents + cents }).eq("id", id).eq("spent_cents", data.spent_cents).select("id");
+    if (upd?.length) return;
+  }
+}
+
+/** Debt the machine owes (0 when none). The stop path already clears it, but a reply mid-tick can still overshoot. */
+export function debtCents(m: Machine): number { return Math.max(0, -remainingCents(m)); }

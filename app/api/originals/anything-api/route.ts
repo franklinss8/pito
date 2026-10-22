@@ -2,7 +2,8 @@ import { db, PUBLIC_MACHINE_COLUMNS } from "@/lib/db";
 import { env } from "@/lib/env";
 import { verifyAction } from "@/lib/auth";
 import { fail, handleError, ok, readJson, str } from "@/lib/http";
-import { addStep } from "@/lib/machines";
+import { addStep, remainingCents, startComputer } from "@/lib/machines";
+import type { Machine } from "@/lib/db";
 import { listGpuTypes, priceCents } from "@/lib/runpod";
 import { AI_MODELS, ANYTHING_API } from "@/lib/templates";
 
@@ -20,14 +21,20 @@ export async function POST(req: Request) {
     const g = (await listGpuTypes()).find((x) => x.id === gpuTypeId && x.available);
     if (!g || !g.pricePerHourUsd) return fail(400, "bad_gpu", "That GPU is not available right now.");
     const wallet = await verifyAction({ message: b.message, signature: b.signature, action: "create", target: "anything-api" });
+    const { count: mine } = await db().from("machines").select("id", { count: "exact", head: true }).eq("creator", wallet).eq("template_id", ANYTHING_API.id);
+    const cap = env.treasury ? 20 : 1;
+    if ((mine ?? 0) >= cap) return fail(429, "too_many_apis", env.treasury ? "You already run 20 APIs. Stop one first." : "Free mode allows one Anything API per wallet.");
     const mission = `Build and host this HTTP API:\n\n${spec}`;
     const { data, error } = await db().from("machines").insert({
       name, symbol: "API", description: spec.slice(0, 500), creator: wallet, mission, template_id: ANYTHING_API.id,
       gpu_type_id: g.id, gpu_name: g.displayName, vram_gb: g.memoryInGb, ai_model, cloud_type: "COMMUNITY", price_cents_per_hour: priceCents(g.pricePerHourUsd), status: "bound",
-    }).select("id").single();
+    }).select("*").single();
     if (error) throw error;
-    await addStep(data.id, { kind: "system", note: "Anything API machine created. Waiting for compute funding." });
-    return ok({ id: data.id, price_cents_per_hour: priceCents(g.pricePerHourUsd), treasury: env.treasury, free: !env.treasury }, 201);
+    const m = data as Machine;
+    let started = false;
+    if (!env.treasury && remainingCents(m) > 0) started = (await startComputer(m)).ok; // free mode: boots on its own
+    else await addStep(m.id, { kind: "system", note: "Anything API machine created. Waiting for compute funding." });
+    return ok({ id: m.id, price_cents_per_hour: m.price_cents_per_hour, treasury: env.treasury, free: !env.treasury, started }, 201);
   } catch (e) { return handleError(e); }
 }
 

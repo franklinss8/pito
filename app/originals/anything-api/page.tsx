@@ -95,7 +95,7 @@ export default function AnythingApi() {
             <div className="field"><label>Total</label><div className="plan mono">{cents ? `$${(cents / 100).toFixed(2)}${ethAmt ? ` ≈ ${ethAmt} ETH` : ""}` : "—"}</div></div>
           </div>
           <button className="btn primary" type="button" disabled={!!busy || !g} onClick={build}>{busy ? "Working…" : account ? "Sign, pay and build" : "Connect wallet to build"}</button>
-          <span className="fine">You keep full control: the machine belongs to your wallet, and the code it writes is on the machine. Stop it any time.</span>
+          <span className="fine">The machine belongs to your wallet and the code it writes stays on it; stop it any time from its page. Its page is unlisted but public to anyone with the link, so keep secrets out of the spec and pass them as environment variables.</span>
         </div>
         <aside className="panel">
           <div className="row"><span className="label acc">My APIs</span><button className={`btn small ${listing === "signing" || listing === "loading" ? "busy" : ""}`} type="button" disabled={listing === "signing" || listing === "loading"} onClick={loadMine}>{listing === "signing" ? "Sign in wallet…" : listing === "loading" ? "Loading…" : account ? "Refresh (sign)" : "Connect & list"}</button></div>

@@ -26,17 +26,20 @@ case "${PITO_AI_MODEL:-}" in
 esac
 
 # The app the AI builds is served from /workspace/app on port 8080 (static by default; the AI may replace it with its own server).
-cat > /workspace/app/index.html <<'EOF'
+[ -f /workspace/app/index.html ] || cat > /workspace/app/index.html <<'EOF'
 <!doctype html><meta charset="utf-8"><title>Pito machine</title>
 <style>body{margin:0;background:#0B0B0A;color:#EDEBE3;font:15px ui-monospace,monospace;display:grid;place-items:center;height:100vh}b{color:#C6F24A}</style>
 <div><b>$</b> machine online — the AI is setting up. This page becomes the app.</div>
 EOF
 (cd /workspace/app && nohup python3 -m http.server 8080 >/workspace/pito/http.log 2>&1 &)
 
-# Fetch and run the agent (restarts on crash, keeps work files)
+# Fetch and run the agent (restarts on crash, keeps work files; backs off when it keeps dying)
+backoff=10
 while true; do
   curl -fsSL "$PITO_API/agent/agent.py" -o /workspace/pito/agent.py || { log "cannot download agent"; sleep 30; continue; }
+  started=$(date +%s)
   python3 /workspace/pito/agent.py >>/workspace/pito/agent.log 2>&1
-  report '{"type":"step","kind":"system","note":"AI worker restarted. Work files kept."}'
-  sleep 10
+  if [ $(( $(date +%s) - started )) -gt 300 ]; then backoff=10; else backoff=$(( backoff * 2 > 600 ? 600 : backoff * 2 )); fi
+  report "{\"type\":\"step\",\"kind\":\"system\",\"note\":\"AI worker restarted. Work files kept. Next try in ${backoff}s.\"}"
+  sleep $backoff
 done

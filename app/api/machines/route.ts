@@ -6,7 +6,7 @@ import { ADDRESS_RE, findProgrammableLaunch, readFoundationMetadata, readToken }
 import { fail, handleError, ok, readJson, str } from "@/lib/http";
 import { addStep, listMachines, remainingCents, startComputer } from "@/lib/machines";
 import { listGpuTypes, priceCents } from "@/lib/runpod";
-import { AI_MODELS, getTemplate } from "@/lib/templates";
+import { AI_MODELS, getTemplate, isApiMachine } from "@/lib/templates";
 import type { Machine } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
   try {
     let b; try { b = await readJson(req); } catch { return fail(400, "bad_request", "Send a JSON body."); }
     const mission = str(b.mission, 2000), template_id = getTemplate(str(b.templateId, 40)).id, gpu_type_id = str(b.gpuTypeId, 80);
+    if (isApiMachine(template_id)) return fail(400, "bad_template", "Anything API machines are created from /originals/anything-api.");
     const ai_model = AI_MODELS.some((m) => m.id === b.aiModel) ? String(b.aiModel) : AI_MODELS[0].id;
     const cloud_type = b.cloudType === "SECURE" ? "SECURE" : "COMMUNITY";
     if (mission.length < 20) return fail(400, "bad_mission", "Describe what the computer should build, in at least a sentence.");
@@ -36,7 +37,9 @@ export async function POST(req: Request) {
       if (!env.hasRunpod) return fail(503, "no_gpu_provider", "GPU inventory is not available on this Pito yet.");
       const g = (await listGpuTypes()).find((x) => x.id === gpu_type_id);
       if (!g || !g.pricePerHourUsd) return fail(400, "bad_gpu", "That GPU is not available right now. Pick another.");
-      gpu_name = g.displayName; vram_gb = g.memoryInGb; price = priceCents(g.pricePerHourUsd);
+      const usd = cloud_type === "SECURE" ? g.securePriceUsd : g.pricePerHourUsd;
+      if (!usd) return fail(400, "bad_gpu", "That GPU is not offered on the secure cloud. Pick another or use community.");
+      gpu_name = g.displayName; vram_gb = g.memoryInGb; price = priceCents(usd);
     }
 
     const tokenRaw = str(b.tokenAddress, 42);
@@ -74,6 +77,8 @@ export async function POST(req: Request) {
     if (!/^[A-Z0-9]{1,10}$/.test(symbol)) return fail(400, "bad_symbol", "Ticker: letters and digits only, up to 10.");
     if (image_url && !/^https:\/\/\S+$/i.test(image_url)) return fail(400, "bad_image", "Image URL must start with https://.");
     const creator = await verifyAction({ message: b.message, signature: b.signature, action: "create", target: symbol });
+    const { count: drafts } = await db().from("machines").select("id", { count: "exact", head: true }).eq("creator", creator).is("token_address", null).neq("template_id", "anything-api");
+    if ((drafts ?? 0) >= 3) return fail(429, "too_many_drafts", "You already have 3 unlaunched pages. Launch one on Programmable and bind it first.");
     const { data, error } = await db().from("machines").insert({
       name, symbol, description, image_url, website, x_handle, creator, mission, template_id, gpu_type_id, gpu_name, vram_gb, ai_model, cloud_type, price_cents_per_hour: price, status: "prelaunch",
     }).select("id").single();

@@ -1,5 +1,4 @@
 import "server-only";
-import { parseEther } from "viem";
 
 function need(name: string): string {
   const v = process.env[name];
@@ -35,8 +34,4 @@ export const env = {
   get marginPct(): number { const n = Number(process.env.PITO_MARGIN_PCT ?? "20"); return Number.isFinite(n) ? n : 20; },
   get houseModelUrl() { return process.env.PITO_HOUSE_MODEL_URL || ""; },
   get houseModelName() { return process.env.PITO_HOUSE_MODEL_NAME || "qwen2.5-coder:14b"; },
-  // legacy v1
-  get runpodEndpoint() { return need("RUNPOD_ENDPOINT_ID"); },
-  get runPriceWei(): bigint { return parseEther(process.env.PITO_RUN_PRICE_ETH || "0.005"); },
-  get freeRunsPerDay(): number { const n = Number(process.env.PITO_FREE_RUNS_PER_DAY ?? "1"); return Number.isInteger(n) && n >= 0 ? n : 1; },
 };

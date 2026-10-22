@@ -34,11 +34,12 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
   const [handoff, setHandoff] = useState<Record<string, unknown> | null>(null);
   const [fees, setFees] = useState<{ available: boolean; ledger?: string; creator?: string; native?: boolean; claimable_wei?: string; treasury?: string | null; note?: string } | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
+  const feesAt = useRef(0);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/machines/${initial.id}`, { cache: "no-store" });
     if (r.ok) setD(await r.json());
-    fetch(`/api/machines/${initial.id}/fees`, { cache: "no-store" }).then((x) => x.json()).then(setFees).catch(() => {});
+    if (Date.now() - feesAt.current > 60_000) { feesAt.current = Date.now(); fetch(`/api/machines/${initial.id}/fees`, { cache: "no-store" }).then((x) => x.json()).then(setFees).catch(() => {}); }
   }, [initial.id]);
   useEffect(() => { setOrigin(location.origin); try { const h = localStorage.getItem(`pito-handoff-${initial.id}`); if (h) setHandoff(JSON.parse(h)); } catch {} load(); fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot").then((r) => r.json()).then((j) => setEth(Number(j.data.amount))).catch(() => {}); }, [load]);
   useEffect(() => { const t = setInterval(load, 10_000); return () => clearInterval(t); }, [load]);
@@ -308,7 +309,7 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
                 </div>
               </div>
             )}
-            {isCreator && m.token_address && (
+            {isCreator && (m.token_address || isApi) && (
               <div className="ctas">
                 {(m.status === "running" || m.status === "starting") ? <button className="btn" type="button" disabled={!!busy} onClick={() => signed(`/api/machines/${m.id}/power`, "stop", m.id, { op: "stop" }, "power")}>Stop computer</button>
                   : <button className="btn primary" type="button" disabled={!!busy || remaining <= 0} onClick={() => signed(`/api/machines/${m.id}/power`, "resume", m.id, { op: "resume" }, "power")}>{m.pod_id ? "Resume computer" : "Start computer"}</button>}
@@ -327,7 +328,7 @@ export function ProjectPage({ initial, justCreated }: { initial: Machine; justCr
             {isApi && m.app_updated_at && m.app_url && <a className="btn block primary" href={`${m.app_url}/docs`} target="_blank" rel="noopener noreferrer">Open the docs ↗</a>}
             <div className="mono fine" style={{ overflowWrap: "anywhere" }}>{origin}/app/{m.id}</div>
             <a className={`btn block ${m.app_updated_at ? "primary" : ""}`} href={`/app/${m.id}`} target="_blank" rel="noopener" aria-disabled={!m.app_updated_at}>Open the app ↗</a>
-            {m.app_updated_at && <iframe className="appframe" src={`/app/${m.id}/`} title={`$${m.symbol} app`} sandbox="allow-scripts allow-forms allow-same-origin allow-popups" style={{ height: 420, minHeight: 0 }} />}
+            {m.app_updated_at && <iframe className="appframe" src={`/app/${m.id}/`} title={`$${m.symbol} app`} sandbox="allow-scripts allow-forms allow-popups" style={{ height: 420, minHeight: 0 }} />}
           </div>
         </div>
       </section>

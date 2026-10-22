@@ -17,20 +17,21 @@ async function gql<T>(query: string, variables: Record<string, unknown> = {}): P
   return j.data as T;
 }
 
-export type GpuType = { id: string; displayName: string; memoryInGb: number; secureCloud: boolean; communityCloud: boolean; pricePerHourUsd: number | null; available: boolean };
+export type GpuType = { id: string; displayName: string; memoryInGb: number; secureCloud: boolean; communityCloud: boolean; pricePerHourUsd: number | null; securePriceUsd: number | null; available: boolean };
 
 let gpuCache: { at: number; list: GpuType[] } | null = null;
 
 /** Live GPU inventory with on-demand prices (cached 2 minutes). */
 export async function listGpuTypes(): Promise<GpuType[]> {
   if (gpuCache && Date.now() - gpuCache.at < 120_000) return gpuCache.list;
-  type R = { gpuTypes: { id: string; displayName: string; memoryInGb: number; secureCloud: boolean; communityCloud: boolean; lowestPrice: { uninterruptablePrice: number | null; stockStatus: string | null } | null }[] };
-  const d = await gql<R>(`query { gpuTypes { id displayName memoryInGb secureCloud communityCloud lowestPrice(input: { gpuCount: 1 }) { uninterruptablePrice stockStatus } } }`);
+  type R = { gpuTypes: { id: string; displayName: string; memoryInGb: number; secureCloud: boolean; communityCloud: boolean; lowestPrice: { uninterruptablePrice: number | null; stockStatus: string | null } | null; securePrice: { uninterruptablePrice: number | null } | null }[] };
+  const d = await gql<R>(`query { gpuTypes { id displayName memoryInGb secureCloud communityCloud lowestPrice(input: { gpuCount: 1 }) { uninterruptablePrice stockStatus } securePrice: lowestPrice(input: { gpuCount: 1, secureCloud: true }) { uninterruptablePrice } } }`);
   const list = d.gpuTypes
     .filter((g) => g.memoryInGb >= 8)
     .map((g) => ({
       id: g.id, displayName: g.displayName, memoryInGb: g.memoryInGb, secureCloud: g.secureCloud, communityCloud: g.communityCloud,
       pricePerHourUsd: g.lowestPrice?.uninterruptablePrice ?? null,
+      securePriceUsd: g.securePrice?.uninterruptablePrice ?? null,
       available: !!g.lowestPrice?.uninterruptablePrice && g.lowestPrice?.stockStatus !== "None",
     }))
     .sort((a, b) => (a.pricePerHourUsd ?? 1e9) - (b.pricePerHourUsd ?? 1e9));
@@ -102,15 +103,3 @@ export async function terminatePod(podId: string) { await gql(`mutation ($id: St
 /** Public HTTPS URL of a port exposed by a pod. */
 export function proxyUrl(podId: string, port: number) { return `https://${podId}-${port}.proxy.runpod.net`; }
 
-/* ---- legacy v1 serverless worker ---- */
-export const DONE = new Set(["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"]);
-export type RunpodStatus = { id: string; status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "TIMED_OUT"; output?: { html?: string; model?: string; error?: string }; error?: string };
-export async function submitJob(input: Record<string, unknown>): Promise<string> {
-  const r = await fetch(`https://api.runpod.ai/v2/${env.runpodEndpoint}/run`, { method: "POST", headers: { Authorization: `Bearer ${env.runpodKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ input }), signal: AbortSignal.timeout(20_000) });
-  if (!r.ok) throw new Error(`RunPod ${r.status}`);
-  const j = (await r.json()) as { id?: string }; if (!j.id) throw new Error("RunPod returned no job id"); return j.id;
-}
-export async function jobStatus(id: string): Promise<RunpodStatus> {
-  const r = await fetch(`https://api.runpod.ai/v2/${env.runpodEndpoint}/status/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${env.runpodKey}` }, signal: AbortSignal.timeout(15_000), cache: "no-store" });
-  if (!r.ok) throw new Error(`RunPod ${r.status}`); return (await r.json()) as RunpodStatus;
-}

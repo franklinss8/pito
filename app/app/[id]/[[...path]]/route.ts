@@ -10,7 +10,12 @@ const TYPES: Record<string, string> = {
   woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", txt: "text/plain; charset=utf-8", md: "text/plain; charset=utf-8", wasm: "application/wasm", mp3: "audio/mpeg", mp4: "video/mp4", webm: "video/webm",
 };
 
-function sleepingPage(name: string, symbol: string) {
+const esc = (x: string) => x.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+/** Agent-built pages run in an opaque origin: no cookies, no same-origin access to Pito, no top-level navigation. */
+const SANDBOX = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
+
+function sleepingPage(name0: string, symbol0: string) {
+  const name = esc(name0), symbol = esc(symbol0);
   return `<!doctype html><meta charset="utf-8"><title>${symbol} · sleeping</title>
 <style>body{margin:0;background:#0B0B0A;color:#EDEBE3;font:15px ui-monospace,monospace;display:grid;place-items:center;height:100vh;text-align:center}b{color:#C6F24A}p{color:#9A9B91;max-width:40ch}</style>
 <div><b>$</b> ${name} (${symbol}) has no app online yet.<p>The machine's computer is asleep and no snapshot was published. It wakes up when the creator or holders fund compute.</p></div>`;
@@ -29,14 +34,16 @@ export async function GET(req: Request, { params }: { params: { id: string; path
     const u = new URL(req.url);
     return Response.redirect(`${m.app_url}/${rel}${u.search}`, 302);
   }
-  const key = `${m.id}/${rel || "index.html"}`;
+  let key = `${m.id}/${rel || "index.html"}`;
   const storage = db().storage.from("apps");
   let { data } = await storage.download(key);
-  if (!data && rel && !rel.includes(".")) ({ data } = await storage.download(`${m.id}/${rel.replace(/\/$/, "")}/index.html`));
+  if (!data && rel && !rel.includes(".")) { key = `${m.id}/${rel.replace(/\/$/, "")}/index.html`; ({ data } = await storage.download(key)); }
   if (!data) {
-    if (!rel || rel === "index.html") return new Response(sleepingPage(m.name, `$${m.symbol}`), { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+    if (!rel || rel === "index.html") return new Response(sleepingPage(m.name, `$${m.symbol}`), { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": SANDBOX } });
     return new Response("Not found", { status: 404 });
   }
   const ext = key.split(".").pop()?.toLowerCase() ?? "";
-  return new Response(data, { headers: { "Content-Type": TYPES[ext] ?? "application/octet-stream", "Cache-Control": "public, max-age=60", "X-Pito-Hosted": "snapshot" } });
+  const headers: Record<string, string> = { "Content-Type": TYPES[ext] ?? "application/octet-stream", "Cache-Control": "public, max-age=60", "X-Pito-Hosted": "snapshot", "X-Content-Type-Options": "nosniff" };
+  if (ext === "html" || ext === "htm" || ext === "svg") headers["Content-Security-Policy"] = SANDBOX;
+  return new Response(data, { headers });
 }
