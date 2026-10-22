@@ -12,6 +12,8 @@ const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"],
 export const metadata: Metadata = {
   title: "Pito · Give your token a computer",
   description: "Launch a token on Ethereum through Programmable and give it a machine: a GPU and an AI that builds for your holders, in public.",
+  openGraph: { title: "Pito · Give your token a computer", description: "A GPU and an AI for every token launched on Programmable.", images: ["/icon-512.png"] },
+  twitter: { card: "summary", site: "@pitocomputers", images: ["/icon-512.png"] },
 };
 
 const NAV = [["Discover", "/"], ["Computers", "/computers"], ["Originals", "/originals"], ["Templates", "/templates"], ["API", "/developers"], ["How it works", "/how-it-works"]];
