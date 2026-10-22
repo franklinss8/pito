@@ -31,7 +31,6 @@ export default async function Discover({ searchParams }: { searchParams: { sort?
             </div>
           </div>
           <div className="corner tr">Decentralized compute<br />AI agents per token<br />Ethereum mainnet</div>
-          <div className="corner ml">Tokens<br />power<br />intelligence</div>
           <div className="corner mr">A more<br />capable<br />internet</div>
           <div className="corner bl">GPU compute<br />AI agents<br />Open templates<br />Onchain ownership</div>
           <div className="corner br">Compute<br />Culture<br />Ownership<br />For every token</div>

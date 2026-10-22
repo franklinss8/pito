@@ -65,9 +65,8 @@ nav.links a:hover{color:var(--acc)}
 .ctas{display:flex;gap:12px;flex-wrap:wrap}
 .corner{position:absolute;z-index:1;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);line-height:1.6;max-width:200px}
 .corner.tr{top:20px;right:0;text-align:right}
-.corner.ml{left:0;bottom:22px;top:auto}
 .corner.mr{right:0;top:52%;text-align:right}
-@media (max-width:1180px){.corner.ml,.corner.mr{display:none}}
+@media (max-width:1180px){.corner.mr{display:none}}
 .corner.bl{left:0;bottom:24px}
 .corner.br{right:0;bottom:24px;text-align:right}
 
