@@ -44,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ul>
                 <li><a href="/launch">Launch a token</a></li>
                 <li><a href="/rent">Rent a computer</a></li>
+                <li><a href="https://x.com/pitocomputers" target="_blank" rel="noopener noreferrer">X · @pitocomputers</a></li>
                 <li><a href="https://programmable.market" target="_blank" rel="noopener noreferrer">Programmable</a></li>
                 <li><a href="https://github.com/franklinss8/pito" target="_blank" rel="noopener noreferrer">Source</a></li>
               </ul>
